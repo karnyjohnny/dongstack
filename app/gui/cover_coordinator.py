@@ -41,6 +41,9 @@ class SharedPixmaps:
         while len(self._items) > self._limit:
             self._items.popitem(last=False)
 
+    def snapshot(self):
+        return list(self._items.items())
+
     def __len__(self) -> int:
         return len(self._items)
 
@@ -108,11 +111,7 @@ class CoverCoordinator(QObject):
         self._inflight.discard(url)
         pixmap = QPixmap.fromImage(image)  # R3: QPixmap tylko w GUI
         self._pixmaps.put(url, pixmap)
-        for did, mapped in self._url_by_id.items():
-            if mapped == url:
-                row = self._backend.row_widget(did)
-                if row is not None:
-                    row.set_cover_pixmap(pixmap)
+        self._backend.set_cover(url, pixmap)
         self.pixmapReady.emit(url, pixmap)
         if data is not None and url not in self._saved:
             # dedupe: ten sam url zapisujemy do cover_cache dokładnie raz na sesję

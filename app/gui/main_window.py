@@ -38,7 +38,9 @@ class MainWindow(QMainWindow):
     editRequested = pyqtSignal(int)
     detailsRequested = pyqtSignal(int)
 
-    def __init__(self, animations_enabled: bool = False, parent: QWidget = None) -> None:
+    def __init__(
+        self, animations_enabled: bool = False, parent: QWidget = None, backend_kind: str = "auto"
+    ) -> None:
         super().__init__(parent)
         self.setWindowTitle("DongStack %s" % __version__)
         self.setMinimumSize(960, 600)
@@ -52,7 +54,7 @@ class MainWindow(QMainWindow):
         self.sidebar = SidebarWidget(central)
         root.addWidget(self.sidebar)
 
-        self.dashboard = DashboardWidget(parent=central)
+        self.dashboard = DashboardWidget(parent=central, backend_kind=backend_kind)
         root.addWidget(self.dashboard, 1)
 
         self.setCentralWidget(central)

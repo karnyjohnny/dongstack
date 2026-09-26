@@ -141,6 +141,7 @@ def run_gui(config: ConfigService, demo: bool = False) -> int:
 
     from app.controllers.add_controller import AddController
     from app.controllers.dashboard_controller import DashboardController
+    from app.core.config import KEY_LIST_BACKEND
     from app.gui.add.add_dialog import AddDialog
     from app.gui.main_window import MainWindow
     from app.gui.theme import apply_theme
@@ -158,7 +159,10 @@ def run_gui(config: ConfigService, demo: bool = False) -> int:
     app.setOrganizationName("karnyjohnny")
     apply_theme(app)
 
-    window = MainWindow(animations_enabled=config.animations_enabled)
+    window = MainWindow(
+        animations_enabled=config.animations_enabled,
+        backend_kind=config.get(KEY_LIST_BACKEND, "auto"),
+    )
     window.show_skeleton(4)  # start bez pustego ekranu (Biblia §20)
     window.show()
 
@@ -303,10 +307,8 @@ def run_gui(config: ConfigService, demo: bool = False) -> int:
                 config.set(KEY_SKIP_CLIENT_ID, "1")
             except ValueError:  # pragma: no cover - klucz poza whitelist
                 pass
-    window.dashboard.backend.headerToggled.connect(controller.toggle_universe)
-    window.dashboard.backend.rowCreated.connect(
-        lambda row: row.moveRequested.connect(controller.move_in_universe)
-    )
+    window.dashboard.headerToggled.connect(controller.toggle_universe)
+    window.dashboard.moveRequested.connect(controller.move_in_universe)
     window.detailsRequested.connect(controller.on_details)
 
     # --- AddDialog (leniwie, non-modal; Biblia §15/§24) ----------------------------
@@ -347,6 +349,7 @@ def run_gui(config: ConfigService, demo: bool = False) -> int:
 
     def _open_add_dialog() -> None:
         d = _ensure_dialog()
+        d.set_universes(controller.universes())
         note = (
             ""
             if config.has_client_id
@@ -356,7 +359,9 @@ def run_gui(config: ConfigService, demo: bool = False) -> int:
         d.open()
 
     def _open_edit(d, links) -> None:
-        _ensure_dialog().open_advanced_edit(d, links)
+        dlg = _ensure_dialog()
+        dlg.set_universes(controller.universes())  # rejestr zawsze świeży przy otwarciu
+        dlg.open_advanced_edit(d, links)
 
     def _delete_from_dialog(donghua_id: int) -> None:
         # Undo zamiast Confirm (Biblia §9): soft-delete + SnackBar „Cofnij”

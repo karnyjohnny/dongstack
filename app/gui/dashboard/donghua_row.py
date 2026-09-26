@@ -144,6 +144,7 @@ class DonghuaRow(QFrame):
     def set_donghua(self, d: Donghua) -> None:
         """Pełne zasilenie (tworzenie wiersza / zmiana zawartości)."""
         self._donghua_id = d.id
+        self._cover_url = d.cover_key
         self._universe_id_flag = d.universe_id is not None
         self._full_title = d.title
         self._title.setText(d.title)

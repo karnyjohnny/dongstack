@@ -101,6 +101,7 @@ class DashboardController(QObject):
 
     def on_universes_loaded(self, universes) -> None:
         self._universes = {u.id: u for u in universes}
+        self.universesChanged.emit(dict(self._universes))
 
     def on_universe_created(self, universe_id: int, name: str, request_id: int) -> None:
         self._universes[universe_id] = Universe(id=universe_id, name=name, created_at=utc_now_iso())

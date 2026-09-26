@@ -7,6 +7,13 @@
 > **Dokument wejściowy:** `donghua-tracker-super-specyfikacja-pyqt5.md` (Biblia GUI — 68 sekcji, zasady niepodlegające dyskusji)
 > **Zakres:** architektura, dobór i weryfikacja stosu technologicznego pod Windows 7 / Core 2 Duo / 2 GB RAM, warstwa danych, integracja MAL API, freezing PyInstaller, CI/CD GitHub Actions, plan implementacji.
 >
+>**Changelog v1.1.0 (2026-09-27) — DelegateListBackend (gate G3):**
+> 1. **Pomiary M7 z E5500 (selftest-report.json):** `increment_p95_ms = 0.773` (G2 ≤50 ms ✔, ~60× zapasu), `gui_rebuild300_ms = 1688.7` (G3 ≤150 ms ✘) → zgodnie z §7.4 wjeżdża **DelegateListBackend**: QListView + QAbstractListModel + QStyledItemDelegate (Biblia §43) — malowane wyłącznie widoczne wiersze; `+/−` jako hit-testy w `editorEvent`; nagłówki uniwersów i skeletony w tym samym delegate; tooltipy i menu „przesuń w uniwersum” zachowane. W sandboxie: fill300 174→4.8 ms, rebuild300 494→0.9 ms.
+> 2. **Auto-swap:** `DONGSTACK_LIST_BACKEND = auto|widgets|delegate`; `auto` = delegate powyżej 100 widocznych wpisów, widgets poniżej (Biblia: QListWidget jako baza dla małych bibliotek). Kontrakt sygnałów ListBackend wspólny — kontroler i koordynator okładek nie widzą różnicy.
+> 3. Sygnały wiersza/nagłówka przeniesione na poziom backendu; koordynator okładek przez `backend.set_cover(url, pixmap)`; model delegate czyta współdzielony LRU pixmap przy paint.
+> 4. **Fix uniwersów w dialogu:** `universesChanged` emitowane również przy `on_universes_loaded`, a dialog dostaje świeży rejestr przy każdym otwarciu (combobox „Uniwersum” pusty mimo istniejących uniwersów — raport Windows).
+> 5. Testy delegate: klik `+/−` przez viewport (w tym disabled przy 0/12), toggle nagłówka, set_cover, rebuild<100 ms, auto-swap dashboardu, regresja comboboxa. Razem 281 testów.
+>
 >**Changelog v1.0.1 (2026-09-27):**
 > 1. **Crash przy pisaniu „litera po literze”** (RuntimeError: wrapped C/C++ object of type QLabel has been deleted): `SearchPage._cover_rows` trzymał referencje do wierszy usuniętych przez przebudowę listy, a spóźniona okładka dotykała martwego QLabel. Fix: `_clear_list()` czyści mapy wierszy, `apply_cover` odporny (porzuca martwe referencje); regresja testowa „late cover after rebuild”.
 > 2. **selftest-report.json ginął w frozen exe**: ścieżka raportu preferowała `DONGSTACK_HOME`, który selftest nadpisuje tmp-em; teraz frozen → katalog exe (bat/ps1 go znajdują), dev → DONGSTACK_HOME/cwd.

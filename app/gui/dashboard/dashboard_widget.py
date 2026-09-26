@@ -7,8 +7,6 @@ FAB jest dzieckiem widgetu contentu i pozostaje widoczny podczas scrollowania
 
 from __future__ import annotations
 
-from typing import List
-
 from PyQt5.QtCore import QSize, Qt, pyqtSignal
 from PyQt5.QtWidgets import (
     QFrame,
@@ -25,6 +23,9 @@ from PyQt5.QtWidgets import (
 from app.domain.models import Donghua, SortMode
 from app.gui import theme
 from app.gui.dashboard.list_backend import ListBackend, WidgetListBackend
+
+# gate G3 (§7.4): powyżej progu lista malowana (delegate), poniżej — widgetowa
+AUTO_BACKEND_THRESHOLD = 100
 
 SORT_ACTIONS = [
     (SortMode.UPDATED.value, "Ostatnio aktualizowane"),
@@ -48,13 +49,21 @@ class DashboardWidget(QWidget):
     episodeDecrementRequested = pyqtSignal(int)
     editRequested = pyqtSignal(int)
     detailsRequested = pyqtSignal(int)
+    headerToggled = pyqtSignal(int)
+    moveRequested = pyqtSignal(int, int)
 
-    def __init__(self, backend: ListBackend = None, parent: QWidget = None) -> None:
+    def __init__(
+        self, backend: ListBackend = None, parent: QWidget = None, backend_kind: str = "auto"
+    ) -> None:
         super().__init__(parent)
+        self._backend_kind = (
+            backend_kind if backend_kind in ("auto", "widgets", "delegate") else "auto"
+        )
         self._backend = backend or WidgetListBackend(self)
-        self._backend.rowCreated.connect(self._on_row_created)
+        self._connect_backend(self._backend)
 
         layout = QVBoxLayout(self)
+        self._vlayout = layout
         layout.setContentsMargins(16, 12, 16, 12)
         layout.setSpacing(10)
 
@@ -143,7 +152,12 @@ class DashboardWidget(QWidget):
     def set_section_title(self, title: str) -> None:
         self._section.setText(title)
 
-    def set_items(self, items: List[Donghua]) -> None:
+    def set_items(self, items) -> None:
+        want = self._backend_kind
+        if want == "auto":
+            want = "delegate" if len(items) > AUTO_BACKEND_THRESHOLD else "widgets"
+        if want != self._backend.BACKEND_NAME:
+            self._swap_backend(want)
         self._skeleton_visible = False
         self._backend.set_items(items)
         self._sync_empty_state()
@@ -179,11 +193,27 @@ class DashboardWidget(QWidget):
         self._empty.setVisible(empty)
         self._backend.widget().setVisible(not empty)
 
-    def _on_row_created(self, row) -> None:
-        row.episodeIncrementRequested.connect(self.episodeIncrementRequested)
-        row.episodeDecrementRequested.connect(self.episodeDecrementRequested)
-        row.editRequested.connect(self.editRequested)
-        row.detailsRequested.connect(self.detailsRequested)
+    def _connect_backend(self, b: ListBackend) -> None:
+        b.incrementRequested.connect(self.episodeIncrementRequested)
+        b.decrementRequested.connect(self.episodeDecrementRequested)
+        b.editRequested.connect(self.editRequested)
+        b.detailsRequested.connect(self.detailsRequested)
+        b.headerToggled.connect(self.headerToggled)
+        b.moveRequested.connect(self.moveRequested)
+
+    def _swap_backend(self, want: str) -> None:
+        """Auto-swap gate G3: widgets <-> delegate bez dotykania kontrolera."""
+        from app.gui.dashboard.delegate_backend import DelegateListBackend
+
+        old_w = self._backend.widget()
+        new_b = DelegateListBackend(self) if want == "delegate" else WidgetListBackend(self)
+        self._connect_backend(new_b)
+        idx = self._vlayout.indexOf(old_w)
+        self._vlayout.removeWidget(old_w)
+        old_w.setParent(None)
+        old_w.deleteLater()
+        self._vlayout.insertWidget(idx, new_b.widget(), 1)
+        self._backend = new_b
 
     def resizeEvent(self, event) -> None:  # noqa: N802 (Qt API)
         super().resizeEvent(event)

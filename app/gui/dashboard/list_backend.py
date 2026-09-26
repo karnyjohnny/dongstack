@@ -19,16 +19,27 @@ from PyQt5.QtCore import QObject, QSize, Qt, pyqtSignal
 from PyQt5.QtWidgets import QListWidget, QListWidgetItem, QWidget
 
 from app.domain.models import DisplayHeader, Donghua
+from app.gui.cover_coordinator import shared_pixmaps
 from app.gui.dashboard.donghua_row import DonghuaRow
 from app.gui.dashboard.skeleton import ROW_HEIGHT, SkeletonRow
 from app.gui.dashboard.universe_header import HEADER_HEIGHT, UniverseHeaderRow
 
 
 class ListBackend(QObject):
-    """Interfejs backendu listy + sygnały rowCreated/headerToggled."""
+    """Interfejs backendu listy + jednolite sygnały zdarzeń wiersza/nagłówka."""
+
+    BACKEND_NAME = "base"
 
     rowCreated = pyqtSignal(object)
     headerToggled = pyqtSignal(int)
+    moveRequested = pyqtSignal(int, int)
+    incrementRequested = pyqtSignal(int)
+    decrementRequested = pyqtSignal(int)
+    detailsRequested = pyqtSignal(int)
+    editRequested = pyqtSignal(int)
+
+    def set_cover(self, url: str, pixmap) -> None:
+        raise NotImplementedError
 
     def widget(self) -> QWidget:
         raise NotImplementedError
@@ -54,6 +65,8 @@ class ListBackend(QObject):
 
 class WidgetListBackend(ListBackend):
     """QListWidget + custom row widget; uniformItemSizes, stała wysokość wiersza."""
+
+    BACKEND_NAME = "widgets"
 
     def __init__(self, parent: QWidget = None) -> None:
         super().__init__(parent)
@@ -88,7 +101,16 @@ class WidgetListBackend(ListBackend):
                 else:
                     row = DonghuaRow(self._list)
                     self.rowCreated.emit(row)
+                    row.episodeIncrementRequested.connect(self.incrementRequested)
+                    row.episodeDecrementRequested.connect(self.decrementRequested)
+                    row.detailsRequested.connect(self.detailsRequested)
+                    row.editRequested.connect(self.editRequested)
+                    row.moveRequested.connect(self.moveRequested)
                     row.set_donghua(entry)
+                    if entry.cover_key:
+                        cached = shared_pixmaps().get(entry.cover_key)
+                        if cached is not None:
+                            row.set_cover_pixmap(cached)
                     flags = Qt.ItemIsSelectable | Qt.ItemIsEnabled
                     self._rows[entry.id] = row
                 item = QListWidgetItem(self._list)
@@ -139,6 +161,11 @@ class WidgetListBackend(ListBackend):
 
     def row_widget(self, donghua_id: int) -> Optional[DonghuaRow]:
         return self._rows.get(donghua_id)
+
+    def set_cover(self, url: str, pixmap) -> None:
+        for row in self._rows.values():
+            if getattr(row, "_cover_url", None) == url:
+                row.set_cover_pixmap(pixmap)
 
     # --- wewnętrzne ---------------------------------------------------------------
     def _purge_rows(self) -> None:

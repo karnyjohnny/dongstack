@@ -28,6 +28,7 @@ KEY_ANIMATIONS = "DONGSTACK_ANIMATIONS"  # "0"/"1" (R9: domyślnie wyłączone)
 KEY_LAST_FILTER = "DONGSTACK_LAST_FILTER"  # pamiętany filtr statusów (QoL)
 KEY_LAST_SORT = "DONGSTACK_LAST_SORT"  # pamiętany sort (QoL)
 KEY_SKIP_CLIENT_ID = "DONGSTACK_SKIP_CLIENT_ID"  # „pomiń” z first-run (§5.5)
+KEY_LIST_BACKEND = "DONGSTACK_LIST_BACKEND"  # auto|widgets|delegate (gate G3)
 
 SECRET_KEYS = frozenset({KEY_CLIENT_SECRET})
 
@@ -48,6 +49,7 @@ _DEFAULTS: Dict[str, str] = {
     KEY_PROVIDER: "mal",
     KEY_LOG_LEVEL: "INFO",
     KEY_ANIMATIONS: "0",
+    KEY_LIST_BACKEND: "auto",
 }
 
 _VALID_PROVIDERS = ("mal", "anilist")
