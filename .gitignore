@@ -1,0 +1,43 @@
+# === SEKRETY — nigdy nie commituj (specyfikacja §12) ===
+.env
+
+# === Dane użytkownika (TYLKO katalogi roota; wzorce niekotwiczone zjadły app/data/!) ===
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+/data/
+/logs/
+/backups/
+/covers/
+
+# === Artefakty builda ===
+dist/
+dist-onefile/
+work/
+*.manifest
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.python-version
+
+# === Narzędzia ===
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# === Tymczasowe pliki narzędzi ===
+.tmp/
+*.tmp
+
+# === OS / IDE ===
+Thumbs.db
+Desktop.ini
+.DS_Store
+.idea/
+.vscode/

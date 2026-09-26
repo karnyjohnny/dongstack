@@ -1,0 +1,20 @@
+{
+  "_comment": "Pin zaufania dla CI: build Python-Win7 (Alex313031). Checksumy obliczone praktycznie 2026-09-26 przez pobranie plików z przypiętego commita (tools/hash_python_win7.py). CI odmawia buildu przy niezgodności SHA256.",
+  "repo": "Alex313031/Python-Win7",
+  "commit": "2aba455bcf205d0f12fc55aa59adc352196d46c2",
+  "version": "3.13.5",
+  "files": {
+    "amd64": {
+      "name": "python-3.13.5-amd64-full.exe",
+      "size": 81884004,
+      "sha256": "9670a588c086621763329aabd2cfcfdb9f6f5f04ff515cbd309e64edd0be92b3"
+    },
+    "win32": {
+      "name": "python-3.13.5-full.exe",
+      "size": 77753711,
+      "sha256": "29e3fd56c2904f182a5a390da2f1f7727f6f41f660a042ad955b958eeddf2158"
+    }
+  },
+  "verified_on": "2026-09-26",
+  "regenerate": "python tools/hash_python_win7.py"
+}

@@ -1,0 +1,63 @@
+name: ci
+
+# Lint + testy na każdym push/PR. Build binarek: release.yml (tagi v*).
+# Testy GUI lecą offscreen (QT_QPA_PLATFORM). Testy live API: NIGDY domyślnie (§10).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Install pinned dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt -r requirements-dev.txt
+
+      - name: Ruff (lint + format check, baseline py38)
+        run: |
+          python -m ruff check .
+          python -m ruff format --check .
+
+      - name: Pytest (unit + gui offscreen)
+        env:
+          QT_QPA_PLATFORM: "offscreen"
+        run: python -m pytest tests/unit tests/gui --maxfail=5
+
+      # tests/live jest opt-in (RUN_LIVE_API_TESTS=1 + MAL_CLIENT_ID z GitHub Secrets,
+      # wyłącznie przez workflow_dispatch w release.yml — decyzja D5/D8).
+
+  freeze-smoke:
+    # Strukturalny gate freezera na Windows (sandbox Linux ma statyczny CPython —
+    # packaging/RELEASE_RUNBOOK.md §0). Łapie uszkodzenia .spec na każdym PR.
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Install deps (runtime + freezer)
+        run: |
+          python -m pip install --disable-pip-version-check -r requirements.txt
+          python -m pip install --disable-pip-version-check pyinstaller==6.11.1
+
+      - name: PyInstaller onedir (smoke)
+        run: python -m PyInstaller packaging\dongstack.spec --noconfirm --distpath dist-smoke --workpath work-smoke
+
+      - name: Frozen selftest (offscreen)
+        env:
+          QT_QPA_PLATFORM: "offscreen"
+        run: |
+          & dist-smoke\DongStack\DongStack.exe --selftest
+          if ($LASTEXITCODE -ne 0) { exit 1 }

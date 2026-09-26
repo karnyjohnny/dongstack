@@ -1,0 +1,200 @@
+/* DongStack — warstwa bazowa QSS (flat dark mode, BEZ blur/shadow/gradientów — §6.4.1)
+   Paleta: Biblia GUI §29–§30, §35, §37 */
+
+QWidget {
+    background-color: #121212;
+    color: #E6E1E5;
+    font-family: "Segoe UI";
+    font-size: 13px;
+}
+
+QMainWindow {
+    background-color: #121212;
+}
+
+QLabel {
+    background: transparent;
+    border: none;
+}
+
+QFrame#separator {
+    background-color: #303030;
+    border: none;
+    min-height: 1px;
+    max-height: 1px;
+}
+
+/* --- pola tekstowe (Biblia §35) --- */
+QLineEdit {
+    background-color: #1E1E1E;
+    color: #E6E1E5;
+    border: 1px solid #303030;
+    border-radius: 8px;
+    padding: 8px 10px;
+    selection-background-color: #B39DDB;
+    selection-color: #17131F;
+}
+
+QLineEdit:focus {
+    border-color: #B39DDB;
+}
+
+/* --- przyciski narzędziowe --- */
+QToolButton {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 6px;
+}
+
+QToolButton:hover {
+    background-color: #242424;
+    border-color: #303030;
+}
+
+QToolButton:pressed {
+    background-color: #2A2A2A;
+}
+
+QPushButton {
+    background-color: #242424;
+    color: #E6E1E5;
+    border: 1px solid #303030;
+    border-radius: 8px;
+    padding: 7px 14px;
+}
+
+QPushButton:hover {
+    background-color: #2A2A2A;
+    border-color: #444444;
+}
+
+QPushButton:pressed {
+    background-color: #303030;
+}
+
+QPushButton:disabled {
+    color: #707070;
+    background-color: #1E1E1E;
+    border-color: #262626;
+}
+
+/* --- pasek postępu (Biblia §36): cienki, bez tekstu --- */
+QProgressBar#progressBar {
+    background-color: #2A2A2A;
+    border: none;
+    border-radius: 2px;
+    min-height: 4px;
+    max-height: 4px;
+}
+
+QProgressBar#progressBar::chunk {
+    background-color: #B39DDB;
+    border-radius: 2px;
+}
+
+/* --- combo/spin (Biblia §37) --- */
+QComboBox,
+QSpinBox {
+    background-color: #1E1E1E;
+    color: #E6E1E5;
+    border: 1px solid #303030;
+    border-radius: 7px;
+    padding: 7px;
+}
+
+QComboBox:hover,
+QSpinBox:hover {
+    border-color: #444444;
+}
+
+QComboBox:focus,
+QSpinBox:focus {
+    border-color: #B39DDB;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #242424;
+    color: #E6E1E5;
+    border: 1px solid #444444;
+    selection-background-color: #2A2A2A;
+    selection-color: #E6E1E5;
+    outline: none;
+}
+
+/* --- scrollbar: wąski, płaski, nie rzuca się w oczy --- */
+QScrollBar:vertical {
+    background: #121212;
+    width: 10px;
+    margin: 0px;
+}
+
+QScrollBar::handle:vertical {
+    background: #303030;
+    border-radius: 5px;
+    min-height: 24px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #444444;
+}
+
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+QScrollBar::add-page:vertical,
+QScrollBar::sub-page:vertical {
+    background: transparent;
+}
+
+QScrollBar:horizontal {
+    background: #121212;
+    height: 10px;
+    margin: 0px;
+}
+
+QScrollBar::handle:horizontal {
+    background: #303030;
+    border-radius: 5px;
+    min-width: 24px;
+}
+
+/* --- menu / tooltip --- */
+QMenu {
+    background-color: #242424;
+    color: #E6E1E5;
+    border: 1px solid #444444;
+    border-radius: 8px;
+    padding: 4px;
+}
+
+QMenu::item {
+    padding: 7px 18px;
+    border-radius: 6px;
+}
+
+QMenu::item:selected {
+    background-color: #2A2A2A;
+}
+
+QToolTip {
+    background-color: #242424;
+    color: #E6E1E5;
+    border: 1px solid #444444;
+    border-radius: 6px;
+    padding: 4px 8px;
+}
+
+/* --- listy: przezroczyste tło, bez ramek (reszta w sidebar/cards) --- */
+QListWidget {
+    background-color: #121212;
+    border: none;
+    outline: none;
+}
+
+QListWidget::item {
+    background: transparent;
+    border: none;
+}

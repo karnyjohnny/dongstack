@@ -1,0 +1,122 @@
+/* DongStack — AddDialog / wyszukiwarka MAL / Advanced (Biblia §15–§28) — style gotowe na M4 */
+
+QDialog#addDialog {
+    background-color: #1E1E1E;
+}
+
+QLineEdit#malSearch {
+    font-size: 14px;
+}
+
+QLabel#searchHint {
+    color: #707070;
+    font-size: 12px;
+}
+
+QListWidget#malResults {
+    background: transparent;
+}
+
+QFrame#malResultCard {
+    background-color: #242424;
+    border: 1px solid #303030;
+    border-radius: 10px;
+}
+
+QFrame#malResultCard:hover {
+    border-color: #444444;
+}
+
+/* pozycja już obecna w bibliotece: przygaszone tło, dodawanie NIEZABLOKOWANE (Biblia §23) */
+QFrame#malResultCard[inLibrary="true"] {
+    background-color: #202020;
+}
+
+QLabel#inLibraryBadge {
+    color: #8FBF8F;
+    font-size: 11px;
+}
+
+QPushButton#quickAddButton {
+    background-color: #242424;
+    border: 1px solid #B39DDB;
+    border-radius: 8px;
+    color: #B39DDB;
+    padding: 6px 14px;
+}
+
+QPushButton#quickAddButton:hover {
+    background-color: #2A2A2A;
+}
+
+/* --- segmentowany wybór statusu (Biblia §26) --- */
+QPushButton#statusSegment {
+    background-color: #242424;
+    border: 1px solid #303030;
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: #A0A0A0;
+}
+
+QPushButton#statusSegment:hover {
+    border-color: #444444;
+}
+
+QPushButton#statusSegment:checked {
+    background-color: #2A2A2A;
+    border-color: #B39DDB;
+    color: #E6E1E5;
+}
+
+/* --- wiersze linków streamingowych (Biblia §28) --- */
+QFrame#streamingLinkRow {
+    background: transparent;
+    border: none;
+}
+
+QLabel#advancedTitle {
+    color: #E6E1E5;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+/* --- segmentowy wybór statusu: kolory jak kropki na dashboardzie (feedback M6-fix) ---
+   Niezaznaczone: jaśniejszy, "nie wybrany" wariant koloru statusu.
+   Zaznaczone: pełny kolor statusu + ciemny tekst (jednoznaczny wybór). */
+QPushButton#statusSegment[status="watching"] { color: #A9C4E4; border-color: #3A4A5C; }
+QPushButton#statusSegment[status="watching"]:checked {
+    background-color: #7EA6D9; border-color: #7EA6D9; color: #14181C; font-weight: 600;
+}
+QPushButton#statusSegment[status="completed"] { color: #B7D8B7; border-color: #3E4F3E; }
+QPushButton#statusSegment[status="completed"]:checked {
+    background-color: #8FBF8F; border-color: #8FBF8F; color: #14181C; font-weight: 600;
+}
+QPushButton#statusSegment[status="planned"] { color: #BCC6D4; border-color: #40464F; }
+QPushButton#statusSegment[status="planned"]:checked {
+    background-color: #93A0B4; border-color: #93A0B4; color: #14181C; font-weight: 600;
+}
+QPushButton#statusSegment[status="dropped"] { color: #E0B6B6; border-color: #55403F; }
+QPushButton#statusSegment[status="dropped"]:checked {
+    background-color: #C98B8B; border-color: #C98B8B; color: #14181C; font-weight: 600;
+}
+
+/* --- Usuń (kosz): czerwony akcent ostrzegawczy, Undo zamiast Confirm (Biblia §9) --- */
+QPushButton#deleteButton {
+    background-color: #2A1E1E;
+    border: 1px solid #6E4245;
+    color: #E0B6B6;
+    border-radius: 8px;
+    padding: 7px 14px;
+}
+
+QPushButton#deleteButton:hover {
+    background-color: #C98B8B;
+    border-color: #C98B8B;
+    color: #17131F;
+}
+
+QPushButton#deleteButton:pressed {
+    background-color: #B77676;
+    border-color: #B77676;
+    color: #17131F;
+}

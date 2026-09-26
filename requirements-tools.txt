@@ -1,0 +1,4 @@
+# Wyłącznie narzędzia deweloperskie z tools/ (generowanie brandingu).
+# NIE jest zależnością aplikacji ani buildu exe.
+pillow==12.3.0 ; python_version >= "3.10"
+pillow==10.4.0 ; python_version < "3.10"

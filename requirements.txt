@@ -1,0 +1,16 @@
+# DongStack — zależności runtime (PRZYPINANE — nie bumpować bez decyzji architekta)
+# Track A: Python 3.13.5 (build Python-Win7, Alex313031) | Track B: Python 3.8.10 (oficjalny)
+# Wszystkie piny zweryfikowane na PyPI 2026-09-26 pod kątem: requires_python, kół Windows, Win7.
+# Release CI instaluje runtime z requirements.lock.txt (--require-hashes, decyzja D8).
+# Szczegóły: docs/SPECYFIKACJA-TECHNICZNA.md §2.3–§2.4
+
+PyQt5==5.15.11
+PyQt5-Qt5==5.15.2
+PyQt5-sip==12.19.0 ; python_version >= "3.10"
+PyQt5-sip==12.15.0 ; python_version < "3.10"
+
+requests==2.32.3
+urllib3==2.2.3
+certifi==2026.7.22
+charset-normalizer==3.4.3
+idna==3.11

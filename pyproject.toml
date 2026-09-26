@@ -1,0 +1,38 @@
+# Konfiguracja narzędzi (bez metadanych dystrybucji — to aplikacja, nie biblioteka).
+# Baseline składniowy: Python 3.8 (specyfikacja §16) — ruff pilnuje twardo.
+
+[tool.ruff]
+target-version = "py38"
+line-length = 100
+extend-exclude = ["build", "dist", "dist-onefile", "work", "tools", "docs"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify (wybiórczo)
+    "UP",  # pyupgrade — z ignorami pilnującymi baseline 3.8
+]
+ignore = [
+    "UP006",  # list[str] itp. — ZAKAZANE (baseline 3.8, Track B)
+    "UP007",  # X | Y w anotacjach — ZAKAZANE (baseline 3.8)
+    "UP035",  # typing.List/Dict/Optional — WYMAGANE u nas
+    "UP045",  # Optional[X] -> X | None — j.w.
+    "SIM108", # ternary vs if/else — czytelność
+    "SIM105", # contextlib.suppress — jawność
+    "UP031",  # %-formatowanie: celowy styl (lazy-format w logach, baseline czytelny)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011", "SIM300"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/unit", "tests/gui"]
+addopts = "-q"
+markers = [
+    "live: testy przeciw produkcyjnemu API (opt-in: RUN_LIVE_API_TESTS=1 + MAL_CLIENT_ID w env)",
+    "gui: testy wymagające QApplication (offscreen w CI)",
+]

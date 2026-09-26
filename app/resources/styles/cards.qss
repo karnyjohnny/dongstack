@@ -1,0 +1,129 @@
+/* DongStack — karty donghua, FAB, skeleton, nagłówki (Biblia §4–§6, §32–§34, §38) */
+
+QFrame#donghuaCard {
+    background-color: #1E1E1E;
+    border: 1px solid #303030;
+    border-radius: 10px;
+}
+
+QFrame#donghuaCard:hover {
+    background-color: #242424;
+    border-color: #444444;
+}
+
+QLabel#titleLabel {
+    color: #E6E1E5;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+QLabel#metaLabel {
+    color: #A0A0A0;
+    font-size: 11px;
+}
+
+QLabel#episodeLabel {
+    color: #E6E1E5;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+QLabel#coverLabel {
+    background-color: #242424;
+    border: none;
+    border-radius: 6px;
+}
+
+/* --- przyciski + / − : zawsze widoczne, hit-area 40×40 (Biblia §6, §33) --- */
+QPushButton#plusButton,
+QPushButton#minusButton {
+    background-color: #242424;
+    border: 1px solid #303030;
+    border-radius: 20px;
+    min-width: 40px;
+    min-height: 40px;
+    max-width: 40px;
+    max-height: 40px;
+    padding: 0px;
+}
+
+QPushButton#plusButton:hover,
+QPushButton#minusButton:hover {
+    background-color: #2A2A2A;
+    border-color: #444444;
+}
+
+QPushButton#plusButton:pressed,
+QPushButton#minusButton:pressed {
+    background-color: #303030;
+}
+
+QPushButton#plusButton:disabled,
+QPushButton#minusButton:disabled {
+    background-color: #1E1E1E;
+    border-color: #262626;
+}
+
+/* --- FAB "dodaj" (Biblia §14, §34) --- */
+QPushButton#addButton {
+    background-color: #B39DDB;
+    color: #17131F;
+    border: none;
+    border-radius: 26px;
+    min-width: 52px;
+    min-height: 52px;
+    max-width: 52px;
+    max-height: 52px;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+QPushButton#addButton:hover {
+    background-color: #C5B3E8;
+}
+
+QPushButton#addButton:pressed {
+    background-color: #9580BF;
+}
+
+/* --- skeleton: STATYCZNY, jeden poziom jaśniejszy od powierzchni (Biblia §21, §38; R9) --- */
+QFrame#donghuaSkeleton {
+    background-color: #1E1E1E;
+    border: 1px solid #262626;
+    border-radius: 10px;
+}
+
+QFrame#skeletonBlock {
+    background-color: #242424;
+    border: none;
+    border-radius: 5px;
+}
+
+/* --- topbar / stany puste --- */
+QLabel#sectionTitle {
+    color: #E6E1E5;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+QLabel#emptyHint {
+    color: #707070;
+    font-size: 13px;
+}
+
+/* --- nagłówek uniwersum (§6.7; pełna funkcja w M5) --- */
+QFrame#universeHeader {
+    background: transparent;
+    border: none;
+}
+
+QLabel#universeTitle {
+    color: #A0A0A0;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+QLabel#universeBadge {
+    color: #707070;
+    font-size: 11px;
+}

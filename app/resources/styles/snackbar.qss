@@ -1,0 +1,26 @@
+/* DongStack — SnackBar (Biblia §10, §39): overlay bez modalności, Undo zamiast Confirm */
+
+QFrame#snackBar {
+    background-color: #242424;
+    border: 1px solid #444444;
+    border-radius: 9px;
+}
+
+QLabel#snackMessage {
+    color: #E6E1E5;
+    background: transparent;
+    padding: 2px 4px;
+}
+
+QPushButton#snackAction {
+    color: #B39DDB;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-weight: 600;
+}
+
+QPushButton#snackAction:hover {
+    background-color: #2A2A2A;
+}

@@ -1,0 +1,53 @@
+/* DongStack — sidebar (Biblia §1.2, §31) */
+
+QFrame#sidebar {
+    background-color: #181818;
+    border: none;
+    border-right: 1px solid #303030;
+}
+
+QLabel#appLogoLabel {
+    color: #E6E1E5;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+QListWidget#statusNavigation {
+    background: transparent;
+    border: none;
+    outline: none;
+}
+
+QListWidget#statusNavigation::item {
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    margin: 2px 8px;
+}
+
+QListWidget#statusNavigation::item:hover {
+    background: #242424;
+}
+
+QListWidget#statusNavigation::item:selected {
+    background: #2A2A2A;
+}
+
+/* NavItemWidget: stan aktywności ustawia inline stylesheet w kodzie (set_active) —
+   bez unpolish/polish, które na Win7/GMA wywoływały wielosekundowe zwisy.
+   Tu tylko typografia i przezroczystość bazowa. */
+QFrame#navItem {
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+}
+
+QLabel#navLabel {
+    color: #A0A0A0;
+    font-size: 13px;
+}
+
+QLabel#navBadge {
+    color: #707070;
+    font-size: 11px;
+}

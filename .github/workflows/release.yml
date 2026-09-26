@@ -1,0 +1,195 @@
+name: release
+
+# Build binarek z tagów v*: matrix [win32, amd64] × [onedir, onefile]
+# na przypiętym buildzie Python-Win7 3.13.5 (commit SHA + SHA256 — supply-chain pin).
+# Runtime instalowany z requirements.lock.txt (--require-hashes, decyzja D8).
+# Artefakty: ZIP (onedir, REKOMENDOWANY) + exe (onefile portable) + SHA256SUMS.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      run_live_tests:
+        description: "Uruchom testy live przeciw produkcyjnemu API (wymaga secret MAL_CLIENT_ID)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+env:
+  PY_REQ: "3.13.5"
+
+jobs:
+  build:
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, win32]
+        package: [onedir, onefile]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read pinned Python-Win7 manifest
+        id: pin
+        shell: pwsh
+        run: |
+          $m = Get-Content packaging/python-win7.json -Raw | ConvertFrom-Json
+          $f = $m.files.'${{ matrix.arch }}'
+          "COMMIT=$($m.commit)"   | Out-File -Append $env:GITHUB_OUTPUT
+          "FILENAME=$($f.name)"   | Out-File -Append $env:GITHUB_OUTPUT
+          "SHA256=$($f.sha256)"   | Out-File -Append $env:GITHUB_OUTPUT
+
+      - name: Download & VERIFY Python-Win7 installer (supply-chain pin)
+        shell: pwsh
+        run: |
+          $url = "https://raw.githubusercontent.com/Alex313031/Python-Win7/${{ steps.pin.outputs.COMMIT }}/${{ env.PY_REQ }}/${{ steps.pin.outputs.FILENAME }}"
+          Invoke-WebRequest -Uri $url -OutFile py-setup.exe
+          $h = (Get-FileHash py-setup.exe -Algorithm SHA256).Hash.ToLower()
+          $expected = "${{ steps.pin.outputs.SHA256 }}".ToLower()
+          if ($h -ne $expected) {
+            Write-Error "SHA256 MISMATCH! expected=$expected got=$h"
+            exit 1
+          }
+          Write-Host "SHA256 OK: $h"
+
+      - name: Install Python-Win7 (silent, per-user)
+        shell: cmd
+        run: |
+          rem InstallAllUsers=1 konfliktuje z oficjalnym CPython 3.13 obecnym na
+          rem runnerze (ten sam UpgradeCode MSI => exit 1603). Per-user omija to.
+          py-setup.exe /quiet InstallAllUsers=0 PrependPath=1 Include_test=0 Include_launcher=0
+
+      - name: Locate Python-Win7 & put on PATH for ALL next steps (GITHUB_PATH)
+        shell: pwsh
+        run: |
+          # PrependPath zapisuje rejestr HKCU, ale procesy joba NIE dziedziczą go
+          # w trakcie trwania joba (bug r6-ci): odkrywiamy ścieżkę i dokładamy
+          # ją przez GITHUB_PATH. Wybieramy interpreter, który RAPORTUJE 3.13.5.
+          $cands = @(
+            (Join-Path $env:LOCALAPPDATA "Programs\Python\Python313\python.exe"),
+            (Join-Path $env:LOCALAPPDATA "Programs\Python\Python313-32\python.exe"),
+            "C:\Program Files\Python313\python.exe",
+            "C:\Program Files (x86)\Python313\python.exe"
+          )
+          $found = $null
+          foreach ($c in $cands) {
+            if (-not (Test-Path $c)) { continue }
+            $ver = (& $c --version 2>&1 | Out-String).Trim()
+            Write-Host "kandydat: $c -> $ver"
+            if ($ver -eq "Python ${{ env.PY_REQ }}") { $found = $c; break }
+          }
+          if (-not $found) {
+            Write-Error "Nie znaleziono Python-Win7 ${{ env.PY_REQ }} po instalacji!"
+            exit 1
+          }
+          $dir = Split-Path $found
+          Add-Content $env:GITHUB_PATH $dir
+          Add-Content $env:GITHUB_PATH (Join-Path $dir "Scripts")
+          Write-Host "PATH += $dir"
+
+      - name: VERIFY interpreter (musi być 3.13.5 z katalogu Python-Win7)
+        shell: pwsh
+        run: |
+          python --version
+          $exe = python -c "import sys; print(sys.executable)"
+          Write-Host "sys.executable = $exe"
+          if ($exe -notmatch "Python313") {
+            Write-Error "Zły interpreter w PATH: $exe (oczekiwano Python-Win7 3.13)"
+            exit 1
+          }
+          python -c "import sys; assert sys.version.startswith('3.13.5'), sys.version"
+
+      - name: Install runtime deps (LOCKED + hashed, D8)
+        run: python -m pip install --disable-pip-version-check --require-hashes -r requirements.lock.txt
+
+      - name: Install build tools (bez hashowania — tylko dev, D8)
+        run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
+
+      - name: Verify frozen-target stack
+        run: |
+          python -c "import PyQt5.QtCore as c; print('Qt', c.QT_VERSION_STR, '| PyQt', c.PYQT_VERSION_STR)"
+          python -m PyInstaller --version
+
+      - name: Unit/GUI smoke (offscreen, na docelowym interpreterze)
+        env:
+          QT_QPA_PLATFORM: "offscreen"
+        run: python -m pytest tests/unit tests/gui --maxfail=3
+
+      - name: Live API tests (opt-in, workflow_dispatch)
+        if: ${{ inputs.run_live_tests == true }}
+        env:
+          RUN_LIVE_API_TESTS: "1"
+          MAL_CLIENT_ID: ${{ secrets.MAL_CLIENT_ID }}
+        run: python -m pytest tests/live -m live --maxfail=1
+
+      - name: Build (${{ matrix.package }} / ${{ matrix.arch }})
+        shell: cmd
+        run: |
+          if "${{ matrix.package }}"=="onefile" (set DHT_ONEFILE=1) else (set DHT_ONEFILE=0)
+          python -m PyInstaller packaging\dongstack.spec --noconfirm ^
+            --distpath dist\${{ matrix.arch }}-${{ matrix.package }} ^
+            --workpath work\${{ matrix.arch }}-${{ matrix.package }}
+
+      - name: Smoke test frozen app (offscreen --selftest)
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $exe = if ("${{ matrix.package }}" -eq "onefile") {
+            "dist\${{ matrix.arch }}-onefile\DongStack.exe"
+          } else {
+            "dist\${{ matrix.arch }}-onedir\DongStack\DongStack.exe"
+          }
+          & $exe --selftest | Tee-Object selftest-${{ matrix.arch }}-${{ matrix.package }}.json
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Package artifacts
+        shell: pwsh
+        run: |
+          if ("${{ matrix.package }}" -eq "onedir") {
+            Compress-Archive "dist\${{ matrix.arch }}-onedir\DongStack" `
+              "DongStack-${{ env.PY_REQ }}-win-${{ matrix.arch }}-onedir.zip"
+          } else {
+            Copy-Item "dist\${{ matrix.arch }}-onefile\DongStack.exe" `
+              "DongStack-${{ env.PY_REQ }}-win-${{ matrix.arch }}-portable.exe"
+          }
+          Get-FileHash DongStack-* | ForEach-Object {
+            "{0}  {1}" -f $_.Hash.ToLower(), (Split-Path $_.Path -Leaf)
+          } | Out-File -Encoding ascii SHA256SUMS-${{ matrix.arch }}-${{ matrix.package }}.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.arch }}-${{ matrix.package }}
+          path: |
+            DongStack-*
+            SHA256SUMS-*.txt
+            selftest-*.json
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Merge checksums
+        run: cat artifacts/SHA256SUMS-*.txt | sort -u > artifacts/SHA256SUMS.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/DongStack-*-onedir.zip
+            artifacts/DongStack-*-portable.exe
+            artifacts/SHA256SUMS.txt
+          generate_release_notes: true
+          body: |
+            ## Instalacja (Windows 7 SP1+)
+            **Rekomendowane (zwłaszcza stary sprzęt):** `…-onedir.zip` — rozpakuj i uruchom `DongStack\DongStack.exe` (najszybszy start).
+            **Portable:** `…-portable.exe` — jeden plik; wolniejszy start (rozpakowuje się do %TEMP%).
+            Weryfikacja integralności: `SHA256SUMS.txt` (`certutil -hashfile <plik> SHA256`).

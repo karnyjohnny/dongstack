@@ -1,0 +1,15 @@
+# DongStack — zależności deweloperskie (testy/build/lint). NIGDY nie w runtime użytkownika.
+-r requirements.txt
+
+# Freezer (wersja zależna od tracka — specyfikacja §2.2)
+pyinstaller==6.11.1 ; python_version >= "3.10"
+pyinstaller==5.13.2 ; python_version < "3.10"
+pyinstaller-hooks-contrib==2025.5
+
+# Testy
+pytest==8.3.5
+pytest-qt==4.4.0
+responses==0.25.7
+
+# Lint / format (baseline py38 — patrz pyproject.toml)
+ruff==0.9.10
