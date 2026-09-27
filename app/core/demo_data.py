@@ -36,6 +36,23 @@ _TITLES = [
     ("Feng Ying Zhi Ge", 2021, 12),
 ]
 
+# Tytuły alternatywne (jak z MAL/AniList) — demo pokazuje drugą linię karty (r11).
+# Brak wpisu = baza nie zwróciła alta (linia w karcie jest wtedy zwinięta).
+_ALTS = {
+    "Doupo Cangqiong": "Battle Through the Heavens",
+    "Fanren Xiu Xian Zhuan": "A Record of a Mortal's Journey to Immortality",
+    "Ling Long": "Ling Cage: Incarnation",
+    "Wu Dong Qian Kun": "Martial Universe",
+    "Xian Ni": "Renegade Immortal",
+    "Shen Yin Wang Zuo": "Throne of Seal",
+    "Yao Shen Ji": "Tales of Demons and Gods",
+    "Quan Zhi Gao Shou": "The King's Avatar",
+    "Mo Dao Zu Shi": "Grandmaster of Demonic Cultivation",
+    "Tian Bao Fuyao Lu": "The Legend of Tianbao",
+}
+
+_DEMO_NOTE = "Numeracja na CDA: 52 + nr odcinka tego sezonu"
+
 
 def demo_rows(count: int = 300) -> List[Donghua]:
     """Deterministyczna biblioteka demo (statusy/postępy rozłożone jak w realu)."""
@@ -62,7 +79,8 @@ def demo_rows(count: int = 300) -> List[Donghua]:
                 mal_id=30000 + i,
                 provider="mal",
                 title=title + suffix,
-                title_alt=title,
+                title_alt=_ALTS.get(title),  # r11: alt tylko gdy baza go ma
+                note=_DEMO_NOTE if i % 23 == 0 else None,
                 total_episodes=total,
                 current_episode=cur,
                 status=status,

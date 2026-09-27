@@ -22,6 +22,12 @@ QLabel#metaLabel {
     font-size: 11px;
 }
 
+/* QoL r11: tytuł alternatywny pod nazwą (dashboard + nagłówek AdvancedPage) */
+QLabel#altLabel {
+    color: #8A8A8A;
+    font-size: 10px;
+}
+
 QLabel#episodeLabel {
     color: #E6E1E5;
     font-size: 14px;

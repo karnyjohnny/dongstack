@@ -14,6 +14,7 @@ from PyQt5.QtWidgets import (
     QApplication,
     QDialog,
     QLineEdit,
+    QPlainTextEdit,
     QShortcut,
     QSpinBox,
     QStackedWidget,
@@ -38,7 +39,7 @@ class AddDialog(QDialog):
         super().__init__(parent)
         self.setObjectName("addDialog")
         self.setWindowTitle("Dodaj donghua")
-        self.resize(640, 600)
+        self.resize(660, 620)
         self.setModal(False)
         # Qt.Tool: pomocnicze okno ZAWSZE nad rodzicem (na Windows potrafiło
         # otwierać się za MainWindow = wrażenie „brak reakcji” po kliknięciu FAB)
@@ -124,7 +125,9 @@ class AddDialog(QDialog):
         if self.stack.currentIndex() != 1:
             return  # linki istnieją tylko na AdvancedPage
         focus = QApplication.focusWidget()
-        if isinstance(focus, (QLineEdit, QTextEdit, QSpinBox)):
+        # r11: QPlainTextEdit (notatka) NIE jest podklasą QTextEdit — bez tego
+        # Ctrl+V w notatce doklejałby wiersz linku zamiast wkleić tekst.
+        if isinstance(focus, (QLineEdit, QTextEdit, QPlainTextEdit, QSpinBox)):
             return  # zwykłe Ctrl+V w polu ma pierwszeństwo
         text = QApplication.clipboard().text().strip()
         if not self._url_like(text):

@@ -50,6 +50,10 @@ class DashboardController(QObject):
     restoreRequested = pyqtSignal(int, int)
     saveFullRequested = pyqtSignal(object, object, int)  # Donghua, linki, rid
     saveUniverseOrderRequested = pyqtSignal(int, int, int)  # id, order, rid
+    # QoL r11: zarządzanie uniwersami z Ustawień (usuwanie + Undo przez odtworzenie)
+    deleteUniverseRequested = pyqtSignal(int, int)  # universe_id, rid
+    createUniverseRequested = pyqtSignal(str, object, int)  # name, anchor_mal_id, rid
+    attachUniverseRequested = pyqtSignal(int, int, int)  # donghua_id, universe_id, rid
     updateCoverKeyRequested = pyqtSignal(int, str, int)  # id, cover_url, rid
     backfillRequested = pyqtSignal(int, int)  # donghua_id, mal_id
 
@@ -71,6 +75,8 @@ class DashboardController(QObject):
         self._text = ""
         self._sort = initial_sort
         self._universes: Dict[int, Universe] = {}
+        self._pending_universe_restore: Dict[int, list] = {}  # rid → [(id, order)] (Undo r11)
+        self._pending_universe_delete: Dict[int, dict] = {}  # rid → dane do rollbacku (nack)
         self._backfill_done = set()  # id bez cover_key już zgłoszone
         self._relations: Dict[int, list] = {}  # mal_id → relacje (sesja, §4.9)
         self._links: Dict[int, list] = {}  # donghua_id → List[StreamingLink]
@@ -80,6 +86,8 @@ class DashboardController(QObject):
             worker.universesLoaded.connect(self.on_universes_loaded)
             worker.universeCreated.connect(self.on_universe_created)
             worker.universeAttached.connect(self.on_universe_attached)
+            worker.universeDeleted.connect(self.on_universe_deleted)
+            worker.universeDeleteFailed.connect(self._on_universe_delete_failed)
             worker.linksLoaded.connect(self.on_links_loaded)
             worker.fullSaved.connect(self._on_full_ok)
             worker.fullFailed.connect(self._on_full_fail)
@@ -90,6 +98,9 @@ class DashboardController(QObject):
             self.restoreRequested.connect(worker.restore)
             self.saveFullRequested.connect(worker.saveFull)
             self.saveUniverseOrderRequested.connect(worker.saveUniverseOrder)
+            self.deleteUniverseRequested.connect(worker.deleteUniverse)
+            self.createUniverseRequested.connect(worker.createUniverse)
+            self.attachUniverseRequested.connect(worker.attachUniverse)
 
     # ================================================================== LOAD / DEMO
     def on_library_loaded(self, rows: List[Donghua]) -> None:
@@ -105,6 +116,9 @@ class DashboardController(QObject):
     def on_universe_created(self, universe_id: int, name: str, request_id: int) -> None:
         self._universes[universe_id] = Universe(id=universe_id, name=name, created_at=utc_now_iso())
         self.universesChanged.emit(dict(self._universes))
+        members = self._pending_universe_restore.pop(int(request_id), None)
+        if members:  # Undo usunięcia uniwersum: przypnij z powrotem te same sezony
+            self._restore_members(universe_id, list(members))
 
     def on_universe_attached(self, donghua_id: int, universe_id: int, request_id: int) -> None:
         current = self._items.get(donghua_id)
@@ -114,6 +128,7 @@ class DashboardController(QObject):
             self._confirmed[donghua_id] = updated
             self.itemChanged.emit(updated)
             self._refresh()
+            self.universesChanged.emit(dict(self._universes))  # r11: liczniki w Ustawieniach
 
     # --- indeksy dla UniverseService / AddController (§5.6) -------------------------
     def library_index(self) -> Dict[int, Donghua]:
@@ -302,6 +317,104 @@ class DashboardController(QObject):
                 self.saveUniverseOrderRequested.emit(mid, order, self._next_rid())
         self._refresh()
 
+    # ============================================== USUWANIE UNIWERSUM (QoL r11, §6.7)
+    def universe_counts(self) -> Dict[int, int]:
+        """Liczba sezonów w każdym uniwersum — z pamięci (bez SQL w GUI, R2)."""
+        counts: Dict[int, int] = {uid: 0 for uid in self._universes}
+        for d in self._items.values():
+            if d.universe_id is not None and d.universe_id in counts:
+                counts[d.universe_id] += 1
+        return counts
+
+    def universes_with_counts(self) -> List[tuple]:
+        """[(Universe, liczba_sezonów)] posortowane po nazwie — dla okna Ustawień."""
+        counts = self.universe_counts()
+        return sorted(
+            ((u, counts.get(u.id, 0)) for u in self._universes.values()),
+            key=lambda pair: (pair[0].name or "").lower(),
+        )
+
+    def members_of(self, universe_id) -> List[tuple]:
+        """[(donghua_id, universe_order)] — potrzebne do Undo (odtworzenie przypięć)."""
+        uid = int(universe_id)
+        pairs = [
+            (d.id, int(d.universe_order or 0)) for d in self._items.values() if d.universe_id == uid
+        ]
+        return sorted(pairs)
+
+    def request_delete_universe(self, universe_id) -> None:
+        """„Kaskadowe” czyszczenie: uniwersum znika, sezony zostają (universe_id=NULL).
+
+        Biblia §9 (optymistycznie + Undo zamiast Confirm): widok odłączamy od razu,
+        `DELETE` leci kolejką do DbWorker (FK ON DELETE SET NULL robi to samo w bazie).
+        """
+        uid = int(universe_id)
+        uni = self._universes.get(uid)
+        if uni is None:
+            return
+        members = self.members_of(uid)
+        for mid, _order in members:
+            current = self._items.get(mid)
+            if current is not None:
+                detached = dataclasses.replace(current, universe_id=None, universe_order=0)
+                self._items[mid] = detached
+                self._confirmed[mid] = detached
+        self._universes.pop(uid, None)
+        self.universesChanged.emit(dict(self._universes))
+        self._refresh()
+        payload = {"name": uni.name, "anchor": uni.mal_anchor_id, "members": members}
+        self._undo.push(UndoCommand(kind="universe_delete", payload=payload, label="Cofnij"))
+        rid = self._next_rid()
+        self._pending_universe_delete[rid] = {"universe": uni, "members": members}
+        self.snackRequested.emit(
+            "Usunięto uniwersum „%s” (%d) — sezony zostają w bibliotece bez uniwersum."
+            % (uni.name, len(members)),
+            "",
+            None,
+        )
+        if self._worker is not None:
+            self.deleteUniverseRequested.emit(uid, rid)
+
+    def on_universe_deleted(self, universe_id: int, request_id: int) -> None:
+        """Ack: stan w pamięci odłączony już w request_delete_universe (R5: rid)."""
+        self._pending_universe_delete.pop(int(request_id), None)
+        if self._universes.pop(int(universe_id), None) is not None:
+            self.universesChanged.emit(dict(self._universes))
+        log.info("uniwersum %s usunięte (rid=%s)", universe_id, request_id)
+
+    def _on_universe_delete_failed(self, universe_id: int, request_id: int, message: str) -> None:
+        """Nack: przywracamy uniwersum i przynależności w pamięci (bez utraty danych)."""
+        pending = self._pending_universe_delete.pop(int(request_id), None)
+        log.warning("deleteUniverse %s nieudane: %s", universe_id, message)
+        if pending is None:
+            self.snackRequested.emit("Nie udało się usunąć uniwersum.", "", None)
+            return
+        uni = pending["universe"]
+        self._universes[uni.id] = uni
+        for mid, order in pending["members"]:
+            current = self._items.get(mid)
+            if current is not None:
+                restored = dataclasses.replace(current, universe_id=uni.id, universe_order=order)
+                self._items[mid] = restored
+                self._confirmed[mid] = restored
+        self.universesChanged.emit(dict(self._universes))
+        self._refresh()
+        self.snackRequested.emit("Nie udało się usunąć uniwersum.", "", None)
+
+    def _restore_members(self, universe_id: int, members: List[tuple]) -> None:
+        """Undo usunięcia: przypięcie sezonów do odtworzonego uniwersum (kolejność = DB)."""
+        for mid, order in members:
+            if self._worker is not None:
+                self.attachUniverseRequested.emit(int(mid), int(universe_id), self._next_rid())
+            current = self._items.get(mid)
+            if current is not None and current.universe_id != universe_id:
+                updated = dataclasses.replace(
+                    current, universe_id=int(universe_id), universe_order=int(order or 0)
+                )
+                self._items[mid] = updated
+                self._confirmed[mid] = updated
+        self._refresh()
+
     # ================================================================== EDYCJA (AdvancedPage)
     def on_details(self, donghua_id: int) -> None:
         current = self._items.get(donghua_id)
@@ -434,6 +547,22 @@ class DashboardController(QObject):
             self.countsChanged.emit(self.counts())
             if self._worker is not None:
                 self.restoreRequested.emit(prev.id, self._next_rid())
+            return
+        if cmd.kind == "universe_delete":
+            name = str(cmd.get("name") or "").strip()
+            if not name:
+                return
+            members = list(cmd.get("members") or [])
+            if self._worker is None:
+                # tryb bez workera (--demo/testy): odtworzenie lokalne
+                uid = (max(self._universes) + 1) if self._universes else 1
+                self._universes[uid] = Universe(id=uid, name=name, created_at=utc_now_iso())
+                self.universesChanged.emit(dict(self._universes))
+                self._restore_members(uid, members)
+                return
+            rid = self._next_rid()
+            self._pending_universe_restore[rid] = members
+            self.createUniverseRequested.emit(name, cmd.get("anchor"), rid)
             return
         if cmd.kind == "episode":
             prev = cmd.get("prev")

@@ -55,6 +55,8 @@ class DonghuaRow(QFrame):
         self.setFixedHeight(ROW_HEIGHT)
         self._donghua_id: int = 0
         self._full_title: str = ""
+        self._full_alt: str = ""
+        self._note: str = ""
         self._universe_id_flag: bool = False
         self._universe_id = None  # M9: do podświetlenia hover
         self._hl = 0  # M9: poziom podświetlenia uniwersum (0/1/2)
@@ -79,6 +81,12 @@ class DonghuaRow(QFrame):
         self._title = QLabel(self)
         self._title.setObjectName("titleLabel")
         info.addWidget(self._title)
+
+        # QoL r11: tytuł alternatywny pod nazwą (jak w wynikach wyszukiwania)
+        self._alt = QLabel(self)
+        self._alt.setObjectName("altLabel")
+        self._alt.hide()
+        info.addWidget(self._alt)
 
         self._meta = QLabel(self)
         self._meta.setObjectName("metaLabel")
@@ -173,6 +181,8 @@ class DonghuaRow(QFrame):
         self._universe_id = d.universe_id
         self._full_title = d.title
         self._title.setText(d.title)
+        self._set_alt(d.title_alt)
+        self._set_note_tooltip(d.note)
         self._meta.setText(self._meta_text(d))
         self._episode.setText(self._episode_text(d))
         self._apply_progress(d)
@@ -185,6 +195,10 @@ class DonghuaRow(QFrame):
         if d.title != self._full_title:
             self._full_title = d.title
             self._relide_title()
+        if (d.title_alt or "") != self._full_alt:
+            self._set_alt(d.title_alt)
+        if (d.note or "") != self._note:
+            self._set_note_tooltip(d.note)
         self._meta.setText(self._meta_text(d))
         self._episode.setText(self._episode_text(d))
         self._apply_progress(d)
@@ -235,9 +249,35 @@ class DonghuaRow(QFrame):
         width = self._title.width() if self._title.width() > 20 else 320
         self._title.setText(fm.elidedText(self._full_title, Qt.ElideRight, width))
 
+    def _set_alt(self, alt) -> None:
+        """QoL r11: alt-tytuł mniejszą czcionką; pusty = wiersz zwinięty (brak luzu)."""
+        text = str(alt).strip() if alt else ""
+        self._full_alt = text
+        if not text:
+            self._alt.clear()
+            self._alt.hide()
+            return
+        fm = self._alt.fontMetrics()
+        width = self._alt.width() if self._alt.width() > 20 else 320
+        self._alt.setText(fm.elidedText(text, Qt.ElideRight, width))
+        self._alt.show()
+
+    def _relide_alt(self) -> None:
+        if self._full_alt:
+            self._set_alt(self._full_alt)
+
+    def _set_note_tooltip(self, note) -> None:
+        """Notatka użytkownika (r11) widoczna w tooltipie karty — bez nowej linii w UI."""
+        self._note = str(note or "")
+        if self._note:
+            self.setToolTip("Notatka: %s" % self._note)
+        else:
+            self.setToolTip("")
+
     def resizeEvent(self, event) -> None:  # noqa: N802 (Qt API)
         super().resizeEvent(event)
         self._relide_title()
+        self._relide_alt()
 
     def enterEvent(self, event) -> None:  # noqa: N802 (Qt API)
         if self._donghua_id:

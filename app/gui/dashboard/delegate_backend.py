@@ -45,6 +45,7 @@ _C_BORDER_HOVER = QColor("#444444")
 _C_TEXT = QColor("#E6E1E5")
 _C_TEXT2 = QColor("#A0A0A0")
 _C_TEXT3 = QColor("#707070")
+_C_ALT = QColor("#8A8A8A")  # r11: tytuł alternatywny (spójnie z QLabel#altLabel)
 _C_ACCENT = QColor("#B39DDB")
 _C_BAR_BG = QColor("#2A2A2A")
 _C_BTN_BG = QColor("#242424")
@@ -142,6 +143,22 @@ class _Model(QAbstractListModel):
         return None
 
 
+def card_text_rects(rect: QRect, text_left: int, text_right: int, has_alt: bool) -> dict:
+    """Geometria linii tekstowych karty (r11: doszła linia tytułu alternatywnego).
+
+    Funkcja czysta — dokładnie te same prostokąty, które maluje CardDelegate,
+    więc testy mogą weryfikować układ bez analizy pikseli. Odpowiednik layoutu
+    widgetowej DonghuaRow (tytuł / alt / meta / pasek postępu).
+    """
+    width = max(0, int(text_right) - int(text_left))
+    title = QRect(text_left, rect.top() + 9, width, 18)
+    alt = QRect(text_left, title.bottom() + 1, width, 13) if has_alt else None
+    anchor = alt if alt is not None else title
+    meta = QRect(text_left, anchor.bottom() + 1, width, 14)
+    bar = QRect(text_left, rect.bottom() - 18, width, 4)
+    return {"title": title, "alt": alt, "meta": meta, "bar": bar}
+
+
 class CardDelegate(QStyledItemDelegate):
     def __init__(self, backend, parent=None):
         super().__init__(parent)
@@ -227,26 +244,41 @@ class CardDelegate(QStyledItemDelegate):
         font.setBold(True)
         painter.setFont(font)
         painter.setPen(QPen(_C_TEXT))
-        title_rect = QRect(text_left, rect.top() + 10, text_right - text_left, 20)
+        rects = card_text_rects(rect, text_left, text_right, bool((d.title_alt or "").strip()))
+        title_rect = rects["title"]
         painter.drawText(
             title_rect,
             Qt.AlignVCenter | Qt.AlignLeft,
             painter.fontMetrics().elidedText(d.title, Qt.ElideRight, title_rect.width()),
         )
+        # QoL r11: tytuł alternatywny (mniejsza czcionka, jak w karcie widgetowej)
+        alt_rect = rects["alt"]
+        if alt_rect is not None:
+            font.setPixelSize(10)
+            font.setBold(False)
+            painter.setFont(font)
+            painter.setPen(QPen(_C_ALT))
+            painter.drawText(
+                alt_rect,
+                Qt.AlignVCenter | Qt.AlignLeft,
+                painter.fontMetrics().elidedText(
+                    (d.title_alt or "").strip(), Qt.ElideRight, alt_rect.width()
+                ),
+            )
         # meta
         font.setPixelSize(11)
         font.setBold(False)
         painter.setFont(font)
         painter.setPen(QPen(_C_TEXT2))
         meta = self._meta_text(d)
-        meta_rect = QRect(text_left, title_rect.bottom() + 2, text_right - text_left, 16)
+        meta_rect = rects["meta"]
         painter.drawText(
             meta_rect,
             Qt.AlignVCenter | Qt.AlignLeft,
             painter.fontMetrics().elidedText(meta, Qt.ElideRight, meta_rect.width()),
         )
         # progress
-        bar = QRect(text_left, rect.bottom() - 18, text_right - text_left, 4)
+        bar = rects["bar"]
         painter.setPen(Qt.NoPen)
         painter.setBrush(_C_BAR_BG)
         painter.drawRoundedRect(bar, 2, 2)

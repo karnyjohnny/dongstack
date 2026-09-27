@@ -18,6 +18,8 @@ class StubWorker(QObject):
     universesLoaded = pyqtSignal(list)
     universeCreated = pyqtSignal(int, str, int)
     universeAttached = pyqtSignal(int, int, int)
+    universeDeleted = pyqtSignal(int, int)  # r11: usuwanie uniwersów z Ustawień
+    universeDeleteFailed = pyqtSignal(int, int, str)
     linksLoaded = pyqtSignal(dict)
     fullSaved = pyqtSignal(object, int)
     fullFailed = pyqtSignal(int, int, str)
@@ -31,6 +33,9 @@ class StubWorker(QObject):
         self.restores = []
         self.fulls = []  # (donghua, links, rid)
         self.orders = []  # (id, order, rid)
+        self.universe_deletes = []  # (universe_id, rid) — r11
+        self.universe_creates = []  # (name, anchor, rid) — r11
+        self.universe_attaches = []  # (donghua_id, universe_id, rid) — r11
 
     @pyqtSlot(int, int, str, int)
     def saveEpisode(self, did, ep, status, rid):
@@ -51,6 +56,18 @@ class StubWorker(QObject):
     @pyqtSlot(int, int, int)
     def saveUniverseOrder(self, did, order, rid):
         self.orders.append((did, order, rid))
+
+    @pyqtSlot(int, int)
+    def deleteUniverse(self, uid, rid):
+        self.universe_deletes.append((int(uid), int(rid)))
+
+    @pyqtSlot(str, object, int)
+    def createUniverse(self, name, anchor, rid):
+        self.universe_creates.append((str(name), anchor, int(rid)))
+
+    @pyqtSlot(int, int, int)
+    def attachUniverse(self, did, uid, rid):
+        self.universe_attaches.append((int(did), int(uid), int(rid)))
 
 
 def _controller(rows=None, worker="stub"):

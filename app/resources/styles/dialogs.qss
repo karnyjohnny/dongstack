@@ -49,7 +49,17 @@ QPushButton#quickAddButton:hover {
     background-color: #2A2A2A;
 }
 
-/* --- segmentowany wybór statusu (Biblia §26) --- */
+/* --- segmentowany wybór statusu (Biblia §26; redesign r12) ---
+   Stany: bazowy → hover → pressed → checked → checked:pressed.
+   Zaznaczony (:checked): ramka 2px w kolorze statusu + pogrubiony napis tym samym
+   kolorem na ciemnym tle #2A2A2A (padding 7/11 kompensuje grubszą ramkę — geometria
+   przycisku nie „skacze”). BEZ pełnego wypełnienia kolorem (stary design: tekst
+   #14181C na fillu statusu — na Win7 nieczytelny, feedback r12).
+   Wciśnięty (:pressed): ramka i tekst o stopień jaśniejsze + tło #303030. Reguły
+   :pressed MUSZĄ istnieć jawnie — bez nich QStyleSheetStyle na Windows oddaje
+   rysowanie natywnemu motywowi aero (ciemnoniebieski/fioletowy fill niezależny
+   od statusu). Fallbacki generyczne (bez property `status`) są neutralne — fioletowy
+   akcent #B39DDB nie pojawia się na segmentach w żadnym stanie. */
 QPushButton#statusSegment {
     background-color: #242424;
     border: 1px solid #303030;
@@ -59,12 +69,27 @@ QPushButton#statusSegment {
 }
 
 QPushButton#statusSegment:hover {
+    background-color: #2A2A2A;
     border-color: #444444;
+}
+
+QPushButton#statusSegment:pressed {
+    background-color: #303030;
+    border-color: #8A8A8A;
+    color: #E6E1E5;
 }
 
 QPushButton#statusSegment:checked {
     background-color: #2A2A2A;
-    border-color: #B39DDB;
+    border: 2px solid #707070;
+    padding: 7px 11px;
+    color: #E6E1E5;
+    font-weight: 600;
+}
+
+QPushButton#statusSegment:checked:pressed {
+    background-color: #303030;
+    border-color: #8A8A8A;
     color: #E6E1E5;
 }
 
@@ -80,25 +105,36 @@ QLabel#advancedTitle {
     font-weight: 600;
 }
 
-/* --- segmentowy wybór statusu: kolory jak kropki na dashboardzie (feedback M6-fix) ---
-   Niezaznaczone: jaśniejszy, "nie wybrany" wariant koloru statusu.
-   Zaznaczone: pełny kolor statusu + ciemny tekst (jednoznaczny wybór). */
+/* --- segmentowy wybór statusu: drabinka kolorów statusu (M6-fix → redesign r12) ---
+   Na status 4 stopnie: ramka stonowana → ramka hover → PEŁNY kolor statusu
+   (ramka + tekst :checked) → jasny (ramka + tekst :pressed).
+   Tekst niezaznaczonego = jasny wariant koloru statusu (jak dotąd).
+   Kolejność reguł w bloku statusu jest istotna: przy równej specyficzności
+   (hover vs pressed vs checked) wygrywa późniejsza — pressed po hover,
+   checked po pressed, checked:pressed na końcu. */
 QPushButton#statusSegment[status="watching"] { color: #A9C4E4; border-color: #3A4A5C; }
-QPushButton#statusSegment[status="watching"]:checked {
-    background-color: #7EA6D9; border-color: #7EA6D9; color: #14181C; font-weight: 600;
-}
+QPushButton#statusSegment[status="watching"]:hover { border-color: #5C789A; }
+QPushButton#statusSegment[status="watching"]:pressed { border-color: #A9C4E4; color: #A9C4E4; }
+QPushButton#statusSegment[status="watching"]:checked { border-color: #7EA6D9; color: #7EA6D9; }
+QPushButton#statusSegment[status="watching"]:checked:pressed { border-color: #A9C4E4; color: #A9C4E4; }
+
 QPushButton#statusSegment[status="completed"] { color: #B7D8B7; border-color: #3E4F3E; }
-QPushButton#statusSegment[status="completed"]:checked {
-    background-color: #8FBF8F; border-color: #8FBF8F; color: #14181C; font-weight: 600;
-}
+QPushButton#statusSegment[status="completed"]:hover { border-color: #668766; }
+QPushButton#statusSegment[status="completed"]:pressed { border-color: #B7D8B7; color: #B7D8B7; }
+QPushButton#statusSegment[status="completed"]:checked { border-color: #8FBF8F; color: #8FBF8F; }
+QPushButton#statusSegment[status="completed"]:checked:pressed { border-color: #B7D8B7; color: #B7D8B7; }
+
 QPushButton#statusSegment[status="planned"] { color: #BCC6D4; border-color: #40464F; }
-QPushButton#statusSegment[status="planned"]:checked {
-    background-color: #93A0B4; border-color: #93A0B4; color: #14181C; font-weight: 600;
-}
+QPushButton#statusSegment[status="planned"]:hover { border-color: #6A7382; }
+QPushButton#statusSegment[status="planned"]:pressed { border-color: #BCC6D4; color: #BCC6D4; }
+QPushButton#statusSegment[status="planned"]:checked { border-color: #93A0B4; color: #93A0B4; }
+QPushButton#statusSegment[status="planned"]:checked:pressed { border-color: #BCC6D4; color: #BCC6D4; }
+
 QPushButton#statusSegment[status="dropped"] { color: #E0B6B6; border-color: #55403F; }
-QPushButton#statusSegment[status="dropped"]:checked {
-    background-color: #C98B8B; border-color: #C98B8B; color: #14181C; font-weight: 600;
-}
+QPushButton#statusSegment[status="dropped"]:hover { border-color: #8F6565; }
+QPushButton#statusSegment[status="dropped"]:pressed { border-color: #E0B6B6; color: #E0B6B6; }
+QPushButton#statusSegment[status="dropped"]:checked { border-color: #C98B8B; color: #C98B8B; }
+QPushButton#statusSegment[status="dropped"]:checked:pressed { border-color: #E0B6B6; color: #E0B6B6; }
 
 /* --- Usuń (kosz): czerwony akcent ostrzegawczy, Undo zamiast Confirm (Biblia §9) --- */
 QPushButton#deleteButton {
@@ -119,4 +155,89 @@ QPushButton#deleteButton:pressed {
     background-color: #B77676;
     border-color: #B77676;
     color: #17131F;
+}
+
+/* --- r11: notatka własna + przewijalny formularz AdvancedPage ------------------ */
+QPlainTextEdit#noteEdit {
+    background-color: #242424;
+    border: 1px solid #303030;
+    border-radius: 6px;
+    color: #E6E1E5;
+    font-size: 12px;
+    padding: 4px;
+    selection-background-color: #4A3F63;
+}
+
+QPlainTextEdit#noteEdit:focus {
+    border-color: #444444;
+}
+
+QScrollArea#advancedScroll {
+    background: transparent;
+    border: none;
+}
+
+/* --- r11: Ustawienia (zakładki MAL API / Uniwersa) — płaski dark, bez cieni ------ */
+QDialog#settingsDialog {
+    background-color: #1E1E1E;
+}
+
+QTabWidget::pane {
+    background-color: #1E1E1E;
+    border: 1px solid #303030;
+    border-radius: 8px;
+    top: -1px;
+}
+
+QTabBar::tab {
+    background-color: #242424;
+    color: #A0A0A0;
+    border: 1px solid #303030;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    padding: 6px 14px;
+    margin-right: 4px;
+    font-size: 12px;
+}
+
+QTabBar::tab:selected {
+    background-color: #1E1E1E;
+    color: #E6E1E5;
+    border-bottom-color: #1E1E1E;
+}
+
+QTabBar::tab:hover {
+    color: #E6E1E5;
+}
+
+QTreeWidget#universesTree {
+    background-color: #242424;
+    border: 1px solid #303030;
+    border-radius: 8px;
+    color: #E6E1E5;
+    font-size: 12px;
+    outline: none;
+}
+
+QTreeWidget#universesTree::item {
+    height: 28px;
+    border: none;
+}
+
+QTreeWidget#universesTree::item:selected {
+    background-color: #3A3350;
+    color: #E6E1E5;
+}
+
+QTreeWidget#universesTree::item:hover {
+    background-color: #2A2A2A;
+}
+
+QHeaderView::section {
+    background-color: #1E1E1E;
+    color: #A0A0A0;
+    border: none;
+    border-bottom: 1px solid #303030;
+    padding: 4px 6px;
+    font-size: 11px;
 }

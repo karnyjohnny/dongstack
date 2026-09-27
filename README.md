@@ -40,6 +40,14 @@ serie łączone w uniwersa i układane w kolejności oglądania.**
   pod kursorem — widzisz rodzinę bez klikania i zwijania.
 - **Wpis ręczny (PPM na `+`):** seria jeszcze bez strony na MAL/AniList (np. sezon
   w produkcji)? Prawy klik na FABie otwiera formularz ręczny z okładką z URL-i podglądem.
+- **Postęp działa, nawet gdy nikt nie zna liczby odcinków.** MAL/AniList zwraca `??` dla
+  sezonów w emisji — DongStack pokazuje wtedy `7/—` i **pozwala klikać `+`** (w edycji
+  liczba odcinków ma wartość `—`, a sufit postępu jest odblokowany).
+- **Notatka przy każdej serii** (np. „na CDA numeracja = 52 + odcinek tego sezonu”) oraz
+  **tytuł alternatywny** pod nazwą na karcie — tak samo jak w wynikach wyszukiwania.
+- **Porządki w uniwersach:** ⚙ Ustawienia → Uniwersa pokazują liczbę sezonów w każdym
+  uniwersum, a usunięcie uniwersum **nie kasuje serii** (zostają bez przynależności,
+  jednym kliknięciem można to cofnąć).
 - **Offline-first:** lokalna baza SQLite + cache wyników i okładek — aplikacja działa bez sieci,
   a MAL odwiedza oszczędnie (≤1 zapytanie/s, kolejka, backoff wykładniczy).
 - **Flat dark mode warstwami jasności** — zero blur/shadow/animowanych gradientów;

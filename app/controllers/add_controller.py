@@ -41,6 +41,12 @@ SEARCH_LIMIT = 20
 UNDO_SNACKBAR_MS = 6000
 
 
+def _clean_note(value) -> Optional[str]:
+    """Normalizacja notatki (r11): trim, pusta/whitespace → None (brak śmieci w bazie)."""
+    text = str(value).strip() if value is not None else ""
+    return text or None
+
+
 class AddController(QObject):
     """Koordynuje SearchPage ⇄ NetworkWorker  DbWorker (przez sygnały main)."""
 
@@ -185,6 +191,7 @@ class AddController(QObject):
             media_type=media if isinstance(media, MediaType) else MediaType.UNKNOWN,
             start_year=form.get("start_year"),
             cover_key=form.get("cover_url"),
+            note=_clean_note(form.get("note")),
             added_at=now,
             updated_at=now,
         )
@@ -218,6 +225,8 @@ class AddController(QObject):
                 media_type=m_media if isinstance(m_media, MediaType) else updated.media_type,
                 cover_key=form.get("cover_url"),
             )
+        if "note" in form:  # QoL r11: notatka edytowalna w każdym trybie
+            updated = _dc.replace(updated, note=_clean_note(form.get("note")))
         links = list(form.get("links") or [])
         self.editSaveRequested.emit(updated, links)
         universe = form.get("universe")
@@ -259,6 +268,7 @@ class AddController(QObject):
             media_type=item.media_type,
             start_year=item.year,
             cover_key=item.cover_url,  # cover_key przechowuje URL (§4.8, M5)
+            note=_clean_note(form.get("note")),  # QoL r11 (kolumna `note` istnieje od v1)
             added_at=now,
             updated_at=now,
         )

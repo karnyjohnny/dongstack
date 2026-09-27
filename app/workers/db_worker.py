@@ -49,6 +49,8 @@ class DbWorker(QObject):
     removeFailed = pyqtSignal(int, int, str)  # donghua_id, request_id, message
     universeCreated = pyqtSignal(int, str, int)  # universe_id, name, request_id
     universeAttached = pyqtSignal(int, int, int)  # donghua_id, universe_id, request_id
+    universeDeleted = pyqtSignal(int, int)  # universe_id, request_id (QoL r11)
+    universeDeleteFailed = pyqtSignal(int, int, str)  # universe_id, request_id, message
     coverSaved = pyqtSignal(str)  # url
     fullSaved = pyqtSignal(object, int)  # Donghua, request_id
     fullFailed = pyqtSignal(int, int, str)  # donghua_id, request_id, message
@@ -203,6 +205,28 @@ class DbWorker(QObject):
             self.universeAttached.emit(int(donghua_id), int(universe_id), int(request_id))
         except sqlite3.Error as exc:
             log.error("attachUniverse nieudane: %s", exc)
+
+    @pyqtSlot(int, int)
+    def deleteUniverse(self, universe_id: int, request_id: int) -> None:
+        """QoL r11: „bezpieczne” usuwanie uniwersum z Ustawień.
+
+        `DELETE FROM universes` + `donghua.universe_id ... ON DELETE SET NULL`
+        (PRAGMA foreign_keys=ON w connection.py) ⇒ sezony ZOSTAJĄ w bibliotece,
+        tracą wyłącznie przynależność. Kontroler dokłada Undo (odtworzenie
+        uniwersum + ponowne przypięcie tych samych id) — Biblia §9.
+        """
+        try:
+            self._ensure_open()
+            ok = self._universes.delete(int(universe_id))
+            if ok:
+                self.universeDeleted.emit(int(universe_id), int(request_id))
+            else:
+                self.universeDeleteFailed.emit(
+                    int(universe_id), int(request_id), "Uniwersum już nie istnieje"
+                )
+        except sqlite3.Error as exc:
+            log.error("deleteUniverse nieudane: %s", exc)
+            self.universeDeleteFailed.emit(int(universe_id), int(request_id), str(exc))
 
     @pyqtSlot(int, int, int)
     def saveUniverseOrder(self, donghua_id: int, order: int, request_id: int) -> None:

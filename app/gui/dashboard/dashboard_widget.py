@@ -45,6 +45,7 @@ class DashboardWidget(QWidget):
     addManualClicked = pyqtSignal()  # M9: PPM na FABie = ręczne dodawanie
     openDataDirRequested = pyqtSignal()  # Ustawienia → otwórz folder danych (M6-fix)
     settingsClientIdRequested = pyqtSignal()  # Ustawienia → Client ID MAL (§5.5)
+    settingsUniversesRequested = pyqtSignal()  # Ustawienia → zarządzanie uniwersami (r11)
     # re-emitowane sygnały wierszy (kontroler podłącza się do dashboardu)
     episodeIncrementRequested = pyqtSignal(int)
     episodeDecrementRequested = pyqtSignal(int)
@@ -107,6 +108,8 @@ class DashboardWidget(QWidget):
         open_dir.triggered.connect(lambda: self.openDataDirRequested.emit())
         cid_act = settings_menu.addAction("Client ID MyAnimeList…")
         cid_act.triggered.connect(lambda: self.settingsClientIdRequested.emit())
+        uni_act = settings_menu.addAction("Uniwersa (przypisane sezony, usuwanie)…")
+        uni_act.triggered.connect(lambda: self.settingsUniversesRequested.emit())
         self._settings.setMenu(settings_menu)
         top.addWidget(self._settings)
         layout.addLayout(top)

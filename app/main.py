@@ -291,12 +291,38 @@ def run_gui(config: ConfigService, demo: bool = False) -> int:
             SNACK_INFO_MS,
         )
 
-    def _open_client_id_settings() -> None:
-        dlg = ClientIdDialog(window, current_id=config.mal_client_id)
-        if dlg.exec() == QDialog.Accepted and dlg.client_id:
-            _apply_client_id(dlg.client_id)
+    def _open_settings(tab: int = 0) -> None:
+        """r11: jedno okno Ustawień (MAL API + Uniwersa) zamiast gołego ClientIdDialog.
 
-    window.dashboard.settingsClientIdRequested.connect(_open_client_id_settings)
+        Usuwanie uniwersum jest „kaskadowe” w sensie czyszczenia przynależności:
+        sezony zostają w bibliotece (FK ON DELETE SET NULL), a Undo siedzi w stopce
+        tego okna — SnackBar byłby przykryty oknem modalnym (Biblia §9).
+        """
+        from app.gui.settings_dialog import SettingsDialog
+
+        dlg = SettingsDialog(
+            window,
+            client_id=config.mal_client_id,
+            universes=controller.universes_with_counts(),
+            tab=tab,
+        )
+        dlg.clientIdChanged.connect(_apply_client_id)
+        dlg.deleteUniverseRequested.connect(controller.request_delete_universe)
+        dlg.undoRequested.connect(controller.undo_last)
+
+        # liczniki/nazwy odświeżają się na żywo (Undo odtwarza uniwersum z nowym id)
+        def refresh(_registry=None) -> None:
+            dlg.set_universes(controller.universes_with_counts())
+
+        controller.universesChanged.connect(refresh)
+        try:
+            dlg.exec()
+        finally:
+            controller.universesChanged.disconnect(refresh)
+            dlg.deleteLater()
+
+    window.dashboard.settingsClientIdRequested.connect(lambda: _open_settings(0))
+    window.dashboard.settingsUniversesRequested.connect(lambda: _open_settings(1))
 
     if not demo and not config.has_client_id and not config.get_bool(KEY_SKIP_CLIENT_ID, False):
         dlg = ClientIdDialog(window)
