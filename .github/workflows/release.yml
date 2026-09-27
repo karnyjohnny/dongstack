@@ -137,13 +137,20 @@ jobs:
         shell: pwsh
         run: |
           $env:QT_QPA_PLATFORM = "offscreen"
+          $out = "selftest-${{ matrix.arch }}-${{ matrix.package }}.json"
+          $env:DONGSTACK_SELFTEST_OUT = $out
           $exe = if ("${{ matrix.package }}" -eq "onefile") {
             "dist\${{ matrix.arch }}-onefile\DongStack.exe"
           } else {
             "dist\${{ matrix.arch }}-onedir\DongStack\DongStack.exe"
           }
-          & $exe --selftest | Tee-Object selftest-${{ matrix.arch }}-${{ matrix.package }}.json
-          if ($LASTEXITCODE -ne 0) { exit 1 }
+          & $exe --selftest | Tee-Object $out | Out-Null
+          $code = $LASTEXITCODE
+          Write-Host "selftest exit code: $code"
+          # Gate M9 (jak ci.yml): raport zrodl-em prawdy + kod wyjscia 0.
+          $report = Get-Content $out -Raw | ConvertFrom-Json
+          Write-Host ("selftest report ok: " + $report.ok)
+          if ($code -ne 0 -or $report.ok -ne $true) { exit 1 }
 
       - name: Package artifacts
         shell: pwsh

@@ -20,7 +20,7 @@ from PyQt5.QtCore import QObject, QTimer, pyqtSignal
 
 from app.core.logging_setup import get_logger
 from app.core.timeutil import utc_now_iso
-from app.domain.models import Donghua, SearchItem, Status
+from app.domain.models import Donghua, MediaType, SearchItem, Status
 from app.gui.theme import STATUS_LABELS as _STATUS_PL
 from app.services.universe_service import UniverseSuggester, UniverseSuggestion
 
@@ -158,6 +158,40 @@ class AddController(QObject):
         """Advanced Add (Biblia §25–§28): status/odcinek/linki/uniwersum z formularza."""
         self._add_item(item, form)
 
+    def manual_add(self, form: dict) -> None:
+        """M9: wpis ręczny (PPM na FABie) — seria bez strony na MAL/AniList.
+
+        mal_id=None + provider='manual'; cover_key trzyma URL okładki (§4.8),
+        więc pipeline okładek ściąga ją dokładnie tak samo jak okładki MAL.
+        """
+        title = str(form.get("title") or "").strip()
+        if not title:
+            return  # walidacja jest też w AdvancedPage; tu obrona przed skrótami
+        now = utc_now_iso()
+        total = int(form.get("total") or 0)
+        episode = int(form.get("episode") or 0)
+        if total > 0:
+            episode = max(0, min(episode, total))
+        media = form.get("media_type")
+        d = Donghua(
+            mal_id=None,
+            anilist_id=None,
+            provider="manual",
+            title=title,
+            title_alt=form.get("title_alt"),
+            total_episodes=total,
+            current_episode=episode,
+            status=form.get("status") or Status.PLANNED,
+            media_type=media if isinstance(media, MediaType) else MediaType.UNKNOWN,
+            start_year=form.get("start_year"),
+            cover_key=form.get("cover_url"),
+            added_at=now,
+            updated_at=now,
+        )
+        self._rid += 1
+        self._pending_links[self._rid] = (list(form.get("links") or []), form.get("universe"))
+        self.dbAddRequested.emit(d, self._rid)
+
     def edit_save(self, d: Donghua, form: dict) -> None:
         """Zapis edycji istniejącej pozycji (AdvancedPage w trybie edycji)."""
         import dataclasses as _dc
@@ -174,6 +208,16 @@ class AddController(QObject):
             current_episode=episode,
             updated_at=_now(),
         )
+        if form.get("manual"):  # M9: ręczny wpis — tytuł/rok/typ/okładka z formularza
+            m_media = form.get("media_type")
+            updated = _dc.replace(
+                updated,
+                title=str(form.get("title") or "").strip() or updated.title,
+                title_alt=form.get("title_alt"),
+                start_year=form.get("start_year"),
+                media_type=m_media if isinstance(m_media, MediaType) else updated.media_type,
+                cover_key=form.get("cover_url"),
+            )
         links = list(form.get("links") or [])
         self.editSaveRequested.emit(updated, links)
         universe = form.get("universe")

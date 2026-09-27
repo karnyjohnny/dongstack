@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from typing import Optional
 
-from PyQt5.QtCore import QSize, Qt, pyqtSignal
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtCore import QRect, QSize, Qt, pyqtSignal
+from PyQt5.QtGui import QColor, QPainter, QPixmap
 from PyQt5.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -32,6 +32,12 @@ _STATUS_PL = {
     Status.DROPPED.value: "porzucone",
 }
 
+# M9 (§6.7): dwupoziomowe podświetlenie uniwersum hoverem.
+# poziom 1 = reszta uniwersum pod kursorem (słaby tint + ćwierć-kryty pasek),
+# poziom 2 = karta pod kursorem (mocniejszy tint + pełny pasek akcentu).
+_HL_TINT = {1: QColor(179, 157, 219, 14), 2: QColor(179, 157, 219, 26)}
+_HL_BAR = {1: QColor(179, 157, 219, 90), 2: QColor(179, 157, 219, 210)}
+
 
 class DonghuaRow(QFrame):
     """Karta: [okładka] [tytuł/meta/postęp] [licznik − +]. Wysokość stała 96 px."""
@@ -41,6 +47,7 @@ class DonghuaRow(QFrame):
     editRequested = pyqtSignal(int)
     detailsRequested = pyqtSignal(int)
     moveRequested = pyqtSignal(int, int)  # donghua_id, delta (±1) w uniwersum
+    hoverStateChanged = pyqtSignal(int, bool)  # donghua_id, kursor wewnątrz?
 
     def __init__(self, parent: QWidget = None) -> None:
         super().__init__(parent)
@@ -49,6 +56,8 @@ class DonghuaRow(QFrame):
         self._donghua_id: int = 0
         self._full_title: str = ""
         self._universe_id_flag: bool = False
+        self._universe_id = None  # M9: do podświetlenia hover
+        self._hl = 0  # M9: poziom podświetlenia uniwersum (0/1/2)
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(12, 8, 12, 8)
@@ -141,11 +150,27 @@ class DonghuaRow(QFrame):
     def donghua_id(self) -> int:
         return self._donghua_id
 
+    @property
+    def universe_id(self):
+        return self._universe_id
+
+    @property
+    def universe_hl(self) -> int:
+        return self._hl
+
+    def set_universe_hl(self, level: int) -> None:
+        """M9: 0=brak, 1=to samo uniwersum co hover, 2=karta pod kursorem."""
+        level = max(0, min(2, int(level)))
+        if level != self._hl:
+            self._hl = level
+            self.update()  # tylko repaint karty (bez re-layoutu listy)
+
     def set_donghua(self, d: Donghua) -> None:
         """Pełne zasilenie (tworzenie wiersza / zmiana zawartości)."""
         self._donghua_id = d.id
         self._cover_url = d.cover_key
         self._universe_id_flag = d.universe_id is not None
+        self._universe_id = d.universe_id
         self._full_title = d.title
         self._title.setText(d.title)
         self._meta.setText(self._meta_text(d))
@@ -213,6 +238,31 @@ class DonghuaRow(QFrame):
     def resizeEvent(self, event) -> None:  # noqa: N802 (Qt API)
         super().resizeEvent(event)
         self._relide_title()
+
+    def enterEvent(self, event) -> None:  # noqa: N802 (Qt API)
+        if self._donghua_id:
+            self.hoverStateChanged.emit(self._donghua_id, True)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:  # noqa: N802 (Qt API)
+        if self._donghua_id:
+            self.hoverStateChanged.emit(self._donghua_id, False)
+        super().leaveEvent(event)
+
+    def paintEvent(self, event) -> None:  # noqa: N802 (Qt API)
+        super().paintEvent(event)  # QSS tło/border karty
+        if not self._hl:
+            return
+        # M9: tint całego uniwersum + pasek akcentu przy lewej krawędzi.
+        # Malowane PO tle QSS, POD widgetami potomnymi (cover/labelki/przyciski).
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(_HL_TINT[self._hl])
+        painter.drawRoundedRect(self.rect().adjusted(1, 1, -1, -1), 10, 10)
+        painter.setBrush(_HL_BAR[self._hl])
+        painter.drawRoundedRect(QRect(1, 10, 3, self.height() - 20), 1, 1)
+        painter.end()
 
     def mousePressEvent(self, event) -> None:  # noqa: N802 (Qt API)
         # klik w kartę (poza przyciskami) = szczegóły/edycja (Biblia §7); M3/M5 podłączy dialog

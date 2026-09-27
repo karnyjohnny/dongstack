@@ -60,4 +60,15 @@ jobs:
           QT_QPA_PLATFORM: "offscreen"
         run: |
           & dist-smoke\DongStack\DongStack.exe --selftest
-          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $code = $LASTEXITCODE
+          Write-Host "selftest exit code: $code"
+          $rp = "dist-smoke\DongStack\selftest-report.json"
+          if (-not (Test-Path $rp)) {
+            Write-Host "::error::Brak selftest-report.json obok exe"
+            exit 1
+          }
+          $report = Get-Content $rp -Raw | ConvertFrom-Json
+          Write-Host ("selftest report ok: " + $report.ok)
+          # Gate M9: raport jest zrodlem prawdy; kod wyjscia musi byc 0
+          # (windowed bootloader potrafil zwrocic 1 mimo ok=true - changelog v1.2.0).
+          if ($code -ne 0 -or $report.ok -ne $true) { exit 1 }

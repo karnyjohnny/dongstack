@@ -7,7 +7,7 @@ Baseline składniowy kodu: Python 3.8 (§16 specyfikacji) — mimo runtime 3.13.
 aby Track B (oficjalny Python 3.8.10 na Win7) działał bez zmian w kodzie.
 """
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 APP_NAME = "DongStack"
 APP_ORG = "karnyjohnny"
 REPO_URL = "https://github.com/karnyjohnny/dongstack"

@@ -307,7 +307,6 @@ def run_gui(config: ConfigService, demo: bool = False) -> int:
                 config.set(KEY_SKIP_CLIENT_ID, "1")
             except ValueError:  # pragma: no cover - klucz poza whitelist
                 pass
-    window.dashboard.headerToggled.connect(controller.toggle_universe)
     window.dashboard.moveRequested.connect(controller.move_in_universe)
     window.detailsRequested.connect(controller.on_details)
 
@@ -336,6 +335,11 @@ def run_gui(config: ConfigService, demo: bool = False) -> int:
             dialog.advancedEditSaveRequested.connect(
                 lambda d, form: add_controller.edit_save(d, form)
             )
+            dialog.manualSaveRequested.connect(lambda form: add_controller.manual_add(form))
+            # M9: podgląd okładki we wpisie ręcznym — fetch WYŁĄCZNIE w NetworkWorker (R1/R3)
+            page_adv = dialog.advanced_page
+            page_adv.set_cover_requester(coordinator.request_pairs)
+            coordinator.pixmapReady.connect(page_adv.apply_cover_preview)
             dialog.deleteRequested.connect(_delete_from_dialog)
             add_controller.stateChanged.connect(lambda s: _apply_search_state(dialog, s))
             add_controller.resultsReady.connect(
@@ -358,6 +362,11 @@ def run_gui(config: ConfigService, demo: bool = False) -> int:
         d.search_page.show_idle(note)
         d.open()
 
+    def _open_manual_dialog() -> None:
+        d = _ensure_dialog()
+        d.set_universes(controller.universes())
+        d.open_manual()
+
     def _open_edit(d, links) -> None:
         dlg = _ensure_dialog()
         dlg.set_universes(controller.universes())  # rejestr zawsze świeży przy otwarciu
@@ -370,6 +379,7 @@ def run_gui(config: ConfigService, demo: bool = False) -> int:
             dialog.close()
 
     controller.addRequested.connect(_open_add_dialog)
+    window.addManualClicked.connect(_open_manual_dialog)
     controller.editRequestedFull.connect(_open_edit)
     return int(app.exec_())
 
@@ -492,29 +502,55 @@ def selftest() -> int:
             and report["increment_p95_ms"] <= 8.0
         )
         report["ok"] = ok
-        # Windowed exe (console=False) nie ma stdout w konsoli użytkownika,
-        # więc raport M7 ląduje ALSO w pliku obok exe / w DONGSTACK_HOME.
-        out_path = os.environ.get("DONGSTACK_SELFTEST_OUT")
-        if not out_path:
-            if paths.is_frozen():
-                # frozen: raport OBOK exe (bat/ps1 szukają %~dp1selftest-report.json);
-                # DONGSTACK_HOME jest w selfteście nadpisywany tmp-em, więc nie może
-                # wygrać z katalogiem exe (bug v1.0.0: raport ginął w tmp)
-                base = os.path.dirname(sys.executable)
-            else:
-                base = os.environ.get("DONGSTACK_HOME") or os.getcwd()
-            out_path = os.path.join(base, "selftest-report.json")
-        try:
-            with open(out_path, "w", encoding="utf-8") as fh:
-                json.dump(report, fh, ensure_ascii=False, indent=2, sort_keys=True)
-            print("selftest-report: %s" % out_path)
-        except OSError:
-            pass
-        print(json.dumps(report, ensure_ascii=False, sort_keys=True))
-        return 0 if ok else 1
+        code = 0 if ok else 1
+    except Exception:  # noqa: BLE001 — selftest NIE może umrzeć bez raportu
+        import traceback as _tb
+
+        report["ok"] = False
+        report["error"] = _tb.format_exc(limit=6)[-1500:]
+        code = 1
     finally:
+        _write_selftest_report(report)
         os.environ.pop("DONGSTACK_HOME", None)
         _cleanup(tmp)
+    if paths.is_frozen():
+        # Windowed bootloader (console=False): wyjątek w teardown interpretera
+        # NIE trafia na stderr (windowed excepthook = niewidzialny messagebox)
+        # i potrafi zmienić kod wyjścia — CI M8: „exit code 1” mimo ok=true.
+        # Twardy exit PO flushu raportu: teardown już nas nie obchodzi,
+        # a gate w ci.yml czyta raport + kod wyjścia.
+        try:
+            sys.stdout.flush()
+            sys.stderr.flush()
+        except Exception:  # noqa: BLE001
+            pass
+        os._exit(code)
+    return code
+
+
+def _write_selftest_report(report: Dict[str, Any]) -> None:
+    """Raport M7: plik obok exe (frozen) / w DONGSTACK_HOME + JSON na stdout.
+
+    Windowed exe (console=False) nie ma stdout w konsoli użytkownika, więc
+    bat/ps1 szukają %~dp1selftest-report.json (bug v1.0.0: raport ginął w tmp).
+    """
+    out_path = os.environ.get("DONGSTACK_SELFTEST_OUT")
+    if not out_path:
+        if paths.is_frozen():
+            base = os.path.dirname(sys.executable)
+        else:
+            base = os.environ.get("DONGSTACK_HOME") or os.getcwd()
+        out_path = os.path.join(base, "selftest-report.json")
+    try:
+        with open(out_path, "w", encoding="utf-8") as fh:
+            json.dump(report, fh, ensure_ascii=False, indent=2, sort_keys=True)
+        print("selftest-report: %s" % out_path)
+    except OSError:
+        pass
+    try:
+        print(json.dumps(report, ensure_ascii=False, sort_keys=True))
+    except Exception:  # noqa: BLE001 — brak stdout (Explorer) nie może boleć
+        pass
 
 
 def _cleanup(directory: str) -> None:

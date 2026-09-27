@@ -95,6 +95,10 @@ def main() -> int:
     window.sidebar.set_current("all")
     window.dashboard.set_section_title("Wszystkie")
     controller.set_sort(SortMode.WATCH_ORDER.value)
+    # M9: pokaż dwupoziomowe podświetlenie uniwersum (hover) na zrzucie
+    first = next(d for d in uni_rows if d.universe_id == 1)
+    window.dashboard.backend.set_universe_hover(1, first.id)
+    app.processEvents()
     ok2 = _shot(window, "universes.png", out_dir)
     return 0 if (ok1 and ok2) else 1
 

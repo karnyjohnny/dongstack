@@ -42,6 +42,7 @@ class DashboardWidget(QWidget):
     localSearchChanged = pyqtSignal(str)
     sortChanged = pyqtSignal(str)
     addClicked = pyqtSignal()
+    addManualClicked = pyqtSignal()  # M9: PPM na FABie = ręczne dodawanie
     openDataDirRequested = pyqtSignal()  # Ustawienia → otwórz folder danych (M6-fix)
     settingsClientIdRequested = pyqtSignal()  # Ustawienia → Client ID MAL (§5.5)
     # re-emitowane sygnały wierszy (kontroler podłącza się do dashboardu)
@@ -49,7 +50,6 @@ class DashboardWidget(QWidget):
     episodeDecrementRequested = pyqtSignal(int)
     editRequested = pyqtSignal(int)
     detailsRequested = pyqtSignal(int)
-    headerToggled = pyqtSignal(int)
     moveRequested = pyqtSignal(int, int)
 
     def __init__(
@@ -132,9 +132,12 @@ class DashboardWidget(QWidget):
         self._add.setObjectName("addButton")
         self._add.setIcon(theme.icon("add_dark"))
         self._add.setIconSize(QSize(24, 24))
-        self._add.setToolTip("Dodaj donghua (Ctrl+N)")
+        self._add.setToolTip("Dodaj donghua (Ctrl+N)\nPPM: wpis ręczny (bez MAL/AniList)")
         self._add.setCursor(Qt.PointingHandCursor)
         self._add.clicked.connect(self.addClicked)
+        # M9: prawy przycisk na FABie = manual add (feedback r7)
+        self._add.setContextMenuPolicy(Qt.CustomContextMenu)
+        self._add.customContextMenuRequested.connect(lambda _pos: self.addManualClicked.emit())
         self._add.setParent(self)
         self._add.raise_()
 
@@ -198,7 +201,6 @@ class DashboardWidget(QWidget):
         b.decrementRequested.connect(self.episodeDecrementRequested)
         b.editRequested.connect(self.editRequested)
         b.detailsRequested.connect(self.detailsRequested)
-        b.headerToggled.connect(self.headerToggled)
         b.moveRequested.connect(self.moveRequested)
 
     def _swap_backend(self, want: str) -> None:

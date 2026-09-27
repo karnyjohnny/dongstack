@@ -7,6 +7,12 @@
 > **Dokument wejściowy:** `donghua-tracker-super-specyfikacja-pyqt5.md` (Biblia GUI — 68 sekcji, zasady niepodlegające dyskusji)
 > **Zakres:** architektura, dobór i weryfikacja stosu technologicznego pod Windows 7 / Core 2 Duo / 2 GB RAM, warstwa danych, integracja MAL API, freezing PyInstaller, CI/CD GitHub Actions, plan implementacji.
 >
+>**Changelog v1.2.0 (2026-09-27) — M9: płaskie uniwersa + wpis ręczny + fix CI:**
+> 1. **CI freeze-smoke: „Process completed with exit code 1” mimo `ok:true`** — root-cause: frozen **windowed** exe (console=False) po wydrukowaniu raportu potrafił złapać wyjątek w teardown interpretera; windowed excepthook PyInstallera kieruje traceback do NIEWIDZIALNEGO messageboxa (brak stderr), a bootloader zwraca 1. Fix: `selftest()` po flushu raportu robi `os._exit(code)` (frozen) — teardown już nie uczestniczy; każdy wyjątek w ciele łapany i zapisywany do raportu jako `error`. Gate w ci.yml i release.yml czyta teraz **raport JSON (`ok`) + kod wyjścia** (raport = źródło prawdy). Wyjaśnienie obserwacji użytkownika: CI uruchamiało się na każdy push (run #16–#20), ale każdy run ginął na tym samym kroku.
+> 2. **Uniwersa bez zwijanych nagłówków (§6.7 M9):** root-cause rozjazdu layoutu (luki/nakładanie z załączników r7) = `uniformItemSizes(True)` + mix wysokości itemów (nagłówek 34 px / karta 96 px). Redesign wg propozycji Właściciela: sort „Uniwersa” = płaska lista kart (bloki uniwersów obok siebie, watch order w bloku), przynależność pokazuje **dwupoziomowe podświetlenie hover** (kursor = mocny tint + pełny pasek akcentu; reszta uniwersum = słaby tint + ćwierć-pasek). Usunięto: `DisplayHeader`, `universe_header.py`, `toggle_universe`, `_collapsed`, obsługa nagłówków w obu backendach.
+> 3. **Ręczne dodawanie donghua (PPM na FABie):** seria bez strony na MAL/AniList (np. „Xiuluo Wushen 3” w produkcji) trafia do biblioteki przez formularz ręczny: tytuł*, tytuł alt, rok, typ, status segmentowy, odcinki, uniwersum, linki + **URL okładki z podglądem** (podgląd ściąga NetworkWorker kolejka LOW — R1/R3, debounce 600 ms, wspólny LRU pixmap). Zapis: `mal_id=NULL` + `provider='manual'` + `cover_key=URL` — schemat bez migracji (UNIQUE(mal_id) toleruje NULL-e). Edycja pozycji ręcznej pokazuje te same pola; Esc zamyka dialog (brak „wstecz” do wyszukiwarki). Walidacja: pusty tytuł = zapis wstrzymany + czerwona ramka.
+> 4. Testy: `test_universe_flat_m9` (płaskość/kolejność/brak collapse API), `test_universe_hover_m9` (poziomy hoveru widget+row, PPM FAB), `test_manual_add_m9` (formularz/walidacja/kontroler/roundtrip repo/edycja manual), delegate hover zamiast toggle nagłówka; `test_grouping_m5` usunięty. Razem 291 testów.
+>
 >**Changelog v1.1.0 (2026-09-27) — DelegateListBackend (gate G3):**
 > 1. **Pomiary M7 z E5500 (selftest-report.json):** `increment_p95_ms = 0.773` (G2 ≤50 ms ✔, ~60× zapasu), `gui_rebuild300_ms = 1688.7` (G3 ≤150 ms ✘) → zgodnie z §7.4 wjeżdża **DelegateListBackend**: QListView + QAbstractListModel + QStyledItemDelegate (Biblia §43) — malowane wyłącznie widoczne wiersze; `+/−` jako hit-testy w `editorEvent`; nagłówki uniwersów i skeletony w tym samym delegate; tooltipy i menu „przesuń w uniwersum” zachowane. W sandboxie: fill300 174→4.8 ms, rebuild300 494→0.9 ms.
 > 2. **Auto-swap:** `DONGSTACK_LIST_BACKEND = auto|widgets|delegate`; `auto` = delegate powyżej 100 widocznych wpisów, widgets poniżej (Biblia: QListWidget jako baza dla małych bibliotek). Kontrakt sygnałów ListBackend wspólny — kontroler i koordynator okładek nie widzą różnicy.
@@ -25,7 +31,7 @@
 > 2. **M8:** wersja aplikacji `1.0.0` (app/__init__ ⇄ version_info), README/runbook aktualne.
 > 3. First-run Client ID (§5.5) z live-attach MAL — domknięte w v1.2.0, zweryfikowane w binarce.
 >
-> **Changelog v1.2.0 (2026-09-26):**
+> **Changelog pre-1.0 (numer draftu „v1.2.0”, przed wydaniem — 2026-09-26):**
 > 1. **§5.5 zaimplementowane (first-run Client ID):** `ClientIdDialog` (instrukcja 3 kroków, pole Client ID, „Zapisz i używaj MAL” / „Pomiń (AniList)”) pokazuje się RAZ przy pierwszym starcie bez ID i bez zapisanego „pomiń” (`DONGSTACK_SKIP_CLIENT_ID`), oraz zawsze z menu ⚙ → „Client ID MyAnimeList…”. Zapis = **live-attach** providera MAL bez restartu (`MetadataService.attach_provider`: providers+breaker+preferred w locie) + snack potwierdzający. Client ID nie jest sekretem (§12) — pole jawne, trafia do `config.json`.
 > 2. Przy okazji: ruff po odzyskanym `app/data` (lint wcześniej pomijał katalog przez .gitignore) — UP004/E501 wyczyszczone.
 > 3. Razem 280 testów.
@@ -500,7 +506,7 @@ dongstack/                               # repo: github.com/karnyjohnny/dongstac
 │   │   │   ├── list_backend.py        # ListBackend (ABC): WidgetListBackend (v1) | DelegateListBackend
 │   │   │   │                          #   (próg 300 pozycji — Biblia §43, gate wydajnościowy §7.4)
 │   │   │   ├── skeleton.py            # SkeletonRow — STATYCZNY (R9)
-│   │   │   └── universe_header.py     # nagłówek grupy uniwersum (§6.7): nazwa + badge + collapse
+│   │   │                              #   (M9: universe_header.py usunięty — płaska lista §6.7)
 │   │   └── add/
 │   │       ├── __init__.py
 │   │       ├── add_dialog.py          # QDialog + QStackedWidget (Biblia §15), non-modal
@@ -1023,23 +1029,34 @@ Biblia §6.2 sugeruje SVG; **decyzja architektoniczna: ikony i logo generuje skr
 
 `Ctrl+F` lokalne szukaj, `Ctrl+N` AddDialog, `Esc` zamyka popup/dialog, `Enter` aktywuje focused button / Quick Add na zaznaczonym wyniku MAL, `↑/↓` nawigacja wyników, `Tab` przez `+`/`−` wierszy (`setFocusPolicy(Qt.TabFocus)`), tooltippy akcji (Biblia §48). Focus widoczny przez border accent (Biblia §35).
 
-## 6.7. Grupowanie uniwersów na dashboardzie (nowość v1.1)
+## 6.7. Uniwersa na dashboardzie (M9: płaska lista + hover-highlight)
 
-- **Tryb grupowania** (przełącznik w menu sortowania, default ON gdy istnieje ≥1 uniwersum): lista główna renderuje sekcje:
-  ```text
-  ▾ Doupo Cangqiong (斗破苍穹)                    4/7 tytułów · 63/120 ep.
-      [S1]  Doupo Cangqiong                       12/12  [−][+]
-      [S2]  Doupo Cangqiong 2nd Season            12/12  [−][+]
-      [S3]  Doupo Cangqiong 3rd Season             3/12  [−][+]
-      [SP]  Doupo Cangqiong Special 1              1/1   [−][+]
-  ▸ Fanren Xiu Xian Zhuan                         (zwinięte — 1 wiersz nagłówka)
-    Ling Long: Incarnation                        5/12  [−][+]   ← pozycje bez uniwersum
-  ```
-- Nagłówek uniwersum = `UniverseHeaderRow` (nieinteraktywny `QListWidgetItem` z własnym widgetem; `flags() & ~Qt.ItemIsSelectable`): nazwa + badge postępu zbiorczego (suma epizodów członków) + strzałka zwinięcia. Klik = toggle collapse (stan w pamięci kontrolera; domyślnie rozwinięte tylko uniwersa zawierające pozycje `watching`).
-- Kolejność członków = `watch_order` (§4.9.2); przedrostek `[S1]/[SP]/[MV]` wynika z media_type+season_hint (chip 24 px, kolor text-muted).
-- Filtry statusów działają ortogonalnie: filtr ukrywa członków, nagłówek znika gdy zero widocznych członków; badge'e sidebara bez zmian (liczą pozycje, nie uniwersa).
-- Wydajność: grupowanie to wyłącznie inna kolejność/sekcje tej samej płaskiej `QListWidget` — zero dodatkowych layoutów; przebudowa przy toggle ≤ 1 rebuild listy (budżet §7.4 G3).
-- Sortowanie "Ostatnio aktualizowane" itd. pozostaje dostępne — tryb grupowania jest wtedy wyłączany (sort globalny > grupowanie), z wyjątkiem sortowania `watch_order`, które jest tożsame z grupowaniem.
+> **Redesign v1.2.0 (feedback produkcyjny r7):** zwijane nagłówki grup USUNIĘTE.
+> Root-cause buga layoutu: `QListWidget.setUniformItemSizes(True)` + dwa rozmiary
+> itemów (nagłówek 34 px / karta 96 px) = niezdefiniowane zachowanie layoutu Qt
+> (luki między grupami przy częściowym rozwinięciu, nakładanie się kart przy
+> rozwinięciu środkowej grupy). Klasa błędu zlikwidowana u źródła: lista ZAWSZE
+> ma jeden rozmiar wiersza.
+
+- **Sort „Uniwersa (kolejność oglądania)”** (`SortMode.WATCH_ORDER`): płaska lista
+  kart; bloki uniwersów stoją obok siebie (kolejność bloków: max updated_at desc,
+  kolejność członków: `watch_order` §4.9.2 + override'y „przesuń ↑/↓” w menu
+  kontekstowym karty), pozycje bez uniwersum na końcu w bieżącym sorcie.
+- **Dwupoziomowe podświetlenie uniwersum (hover):** karta pod kursorem = poziom 2
+  (tint rgba(179,157,219,26) + pełny pasek akcentu 3 px przy lewej krawędzi),
+  pozostałe karty tego samego uniwersum = poziom 1 (tint rgba(179,157,219,14)
+  + pasek ćwierć-kryty). Psychologia: kursor = „tu jestem”, uniwersum = „to rodzina”
+  — bez klikania, bez zwijania, bez utraty kontekstu listy. Implementacja:
+  `DonghuaRow.enterEvent/leaveEvent → hoverStateChanged → backend.set_universe_hover()`
+  (widget backend: repaint tylko kart o zmienionym poziomie; delegate backend:
+  `viewport().update()` — malowane są wyłącznie widoczne wiersze, budżet G3).
+- Brak stanu collapsed w kontrolerze (`toggle_universe`/`_collapsed` USUNIĘTE);
+  `DisplayHeader` i `universe_header.py` usunięte z kodu i z obu backendów.
+- Filtry statusów i lokalne szukanie działają ortogonalnie (bloki liczą się
+  z widocznych pozycji); badge'e sidebara bez zmian (liczą pozycje, nie uniwersa).
+- Wydajność: hover-highlight = repaint ≤ liczby członków uniwersum (widget) lub
+  viewportu (delegate); przebudowa listy przy zmianie filtra/sortu = 1× set_items
+  (budżet §7.4 G3 bez zmian).
 
 ---
 

@@ -33,6 +33,7 @@ class MainWindow(QMainWindow):
     localSearchChanged = pyqtSignal(str)
     sortChanged = pyqtSignal(str)
     addClicked = pyqtSignal()
+    addManualClicked = pyqtSignal()  # M9: PPM na FABie
     episodeIncrementRequested = pyqtSignal(int)
     episodeDecrementRequested = pyqtSignal(int)
     editRequested = pyqtSignal(int)
@@ -66,6 +67,7 @@ class MainWindow(QMainWindow):
         self.dashboard.localSearchChanged.connect(self.localSearchChanged)
         self.dashboard.sortChanged.connect(self.sortChanged)
         self.dashboard.addClicked.connect(self.addClicked)
+        self.dashboard.addManualClicked.connect(self.addManualClicked)
         self.dashboard.episodeIncrementRequested.connect(self.episodeIncrementRequested)
         self.dashboard.episodeDecrementRequested.connect(self.episodeDecrementRequested)
         self.dashboard.editRequested.connect(self.editRequested)

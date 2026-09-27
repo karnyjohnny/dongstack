@@ -9,7 +9,7 @@ from PyQt5.QtTest import QTest
 
 from app.controllers.dashboard_controller import DashboardController
 from app.core.demo_data import demo_rows
-from app.domain.models import DisplayHeader, Donghua, Status, Universe
+from app.domain.models import Donghua, Status, Universe
 from app.gui.add.add_dialog import AddDialog
 from app.gui.dashboard.dashboard_widget import AUTO_BACKEND_THRESHOLD, DashboardWidget
 from app.gui.dashboard.delegate_backend import DelegateListBackend, button_rects
@@ -77,21 +77,27 @@ def test_delegate_minus_disabled_at_zero(qapp):
     b.widget().hide()
 
 
-def test_delegate_header_toggle(qapp):
+def test_delegate_universe_hover_highlight(qapp):
+    """M9: hover na karcie podświetla całe uniwersum (2 poziomy), bez nagłówków."""
     b = DelegateListBackend()
     b.widget().resize(900, 600)
     b.widget().show()
-    h = DisplayHeader(universe_id=5, name="Uni", badge="2 tytuły", collapsed=False)
-    entries = [h] + demo_rows(2)
-    b.set_items(entries)
+    d1 = Donghua(id=1, title="A S1", universe_id=7)
+    d2 = Donghua(id=2, title="A S2", universe_id=7)
+    d3 = Donghua(id=3, title="Solo", universe_id=None)
+    b.set_items([d1, d2, d3])
     qapp.processEvents()
-    assert b.count() == 2  # nagłówek nie liczy się jako pozycja
-    got = []
-    b.headerToggled.connect(got.append)
+    assert b.count() == 3
+    # hover na d1: d1=2 (kursor), d2=1 (to samo uniwersum), d3=0
+    b.set_universe_hover(7, 1)
+    assert b.hover_level(d1) == 2
+    assert b.hover_level(d2) == 1
+    assert b.hover_level(d3) == 0
+    b.set_universe_hover(None, None)
+    assert b.hover_level(d1) == 0
+    # universe_at_pos: środek pierwszej karty
     rect = b.widget().visualRect(b.model.index(0, 0))
-    QTest.mouseClick(b.widget().viewport(), Qt.LeftButton, Qt.NoModifier, rect.center())
-    qapp.processEvents()
-    assert got == [5]
+    assert b.universe_at_pos(rect.center()) == (7, 1)
     b.widget().hide()
 
 

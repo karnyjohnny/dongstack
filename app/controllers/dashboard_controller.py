@@ -22,7 +22,7 @@ from PyQt5.QtCore import QObject, pyqtSignal
 
 from app.core.logging_setup import get_logger
 from app.core.timeutil import utc_now_iso
-from app.domain.models import DisplayHeader, Donghua, SortMode, Status, Universe
+from app.domain.models import Donghua, SortMode, Status, Universe
 from app.domain.undo import UndoCommand, UndoStack
 from app.gui.theme import STATUS_LABELS
 
@@ -71,7 +71,6 @@ class DashboardController(QObject):
         self._text = ""
         self._sort = initial_sort
         self._universes: Dict[int, Universe] = {}
-        self._collapsed = set()  # universe_id zwinięte (§6.7)
         self._backfill_done = set()  # id bez cover_key już zgłoszone
         self._relations: Dict[int, list] = {}  # mal_id → relacje (sesja, §4.9)
         self._links: Dict[int, list] = {}  # donghua_id → List[StreamingLink]
@@ -236,9 +235,16 @@ class DashboardController(QObject):
             self.updateCoverKeyRequested.emit(donghua_id, cover_url, self._next_rid())
         self.coversRequested.emit([updated])
 
-    # ================================================================== GRUPOWANIE (§6.7)
+    # ================================================================== UNIWERSA (§6.7 M9)
     def visible_entries(self) -> list:
-        """Display-model: płaska lista Donghua LUB [DisplayHeader + członkowie]."""
+        """Display-model M9: ZAWSZE płaska lista kart (bez zwijanych nagłówków).
+
+        Feedback produkcyjny r7: nagłówki grup o innej wysokości niż karta
+        + QListWidget.uniformItemSizes = rozjazd layoutu (luki/nakładanie).
+        Sort WATCH_ORDER: bloki uniwersów stoją obok siebie (watch order
+        wewnątrz bloku), potem tytuły bez uniwersum; przynależność pokazuje
+        dwupoziomowe podświetlenie hover (kursor = mocne, reszta uniwersum = słabe).
+        """
         visible = self.visible_items()
         if self._sort != SortMode.WATCH_ORDER:
             return visible
@@ -255,18 +261,8 @@ class DashboardController(QObject):
             key=lambda kv: max(m.updated_at for m in kv[1]),
             reverse=True,
         )
-        for uid, members in ordered_unis:
-            collapsed = uid in self._collapsed
-            entries.append(
-                DisplayHeader(
-                    universe_id=uid,
-                    name=self.universe_name(uid) or members[0].title,
-                    badge=self._universe_badge(members),
-                    collapsed=collapsed,
-                )
-            )
-            if not collapsed:
-                entries.extend(self._order_universe(members))
+        for _uid, members in ordered_unis:
+            entries.extend(self._order_universe(members))
         entries.extend(free)
         return entries
 
@@ -280,20 +276,6 @@ class DashboardController(QObject):
             if mid in ids
         }
         return order_universe(members, relations, warn=log.warning)
-
-    def _universe_badge(self, members: List[Donghua]) -> str:
-        watched = sum(m.current_episode for m in members)
-        total = sum(m.total_episodes for m in members)
-        if total > 0:
-            return "%d tytułów · %d/%d ep." % (len(members), watched, total)
-        return "%d tytułów · %d ep." % (len(members), watched)
-
-    def toggle_universe(self, universe_id: int) -> None:
-        if universe_id in self._collapsed:
-            self._collapsed.discard(universe_id)
-        else:
-            self._collapsed.add(universe_id)
-        self._refresh()
 
     def move_in_universe(self, donghua_id: int, delta: int) -> None:
         """Ręczny override kolejności (↑/↓ w menu kontekstowym wiersza)."""

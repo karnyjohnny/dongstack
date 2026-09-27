@@ -14,8 +14,8 @@ from __future__ import annotations
 
 from typing import Dict, List
 
-from PyQt5.QtCore import QAbstractListModel, QEvent, QModelIndex, QPointF, QRect, QSize, Qt
-from PyQt5.QtGui import QColor, QPainter, QPen, QPolygonF
+from PyQt5.QtCore import QAbstractListModel, QEvent, QModelIndex, QRect, QSize, Qt
+from PyQt5.QtGui import QColor, QPainter, QPen
 from PyQt5.QtWidgets import (
     QListView,
     QMenu,
@@ -26,18 +26,16 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from app.domain.models import DisplayHeader, Donghua
+from app.domain.models import Donghua
 from app.gui import theme
-from app.gui.dashboard.donghua_row import _STATUS_PL
+from app.gui.dashboard.donghua_row import _HL_BAR, _HL_TINT, _STATUS_PL
 from app.gui.dashboard.list_backend import ListBackend
 from app.gui.dashboard.skeleton import ROW_HEIGHT
-from app.gui.dashboard.universe_header import HEADER_HEIGHT
 
 KIND_ROLE = Qt.UserRole + 1
 DATA_ROLE = Qt.UserRole + 2
 
 KIND_ITEM = "item"
-KIND_HEADER = "header"
 KIND_SKELETON = "skeleton"
 
 _C_BG = QColor("#1E1E1E")
@@ -93,7 +91,7 @@ class _Model(QAbstractListModel):
         if role == KIND_ROLE:
             if entry is None:
                 return KIND_SKELETON
-            return KIND_HEADER if isinstance(entry, DisplayHeader) else KIND_ITEM
+            return KIND_ITEM
         if role == DATA_ROLE:
             return entry
         return None
@@ -159,10 +157,7 @@ class CardDelegate(QStyledItemDelegate):
         return rect.adjusted(0, 3, 0, -3)
 
     def sizeHint(self, option, index):
-        kind = index.data(KIND_ROLE)
-        if kind == KIND_HEADER:
-            return QSize(0, HEADER_HEIGHT)
-        return QSize(0, ROW_HEIGHT)
+        return QSize(0, ROW_HEIGHT)  # M9: jednolita wysokość (bug r7: mix sizeHint)
 
     # --- malowanie ---
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
@@ -172,8 +167,6 @@ class CardDelegate(QStyledItemDelegate):
         rect = self._card(option.rect)
         if kind == KIND_SKELETON:
             self._paint_skeleton(painter, rect)
-        elif kind == KIND_HEADER:
-            self._paint_header(painter, rect, index.data(DATA_ROLE))
         else:
             self._paint_card(painter, option, rect, index.data(DATA_ROLE))
         painter.restore()
@@ -191,41 +184,6 @@ class CardDelegate(QStyledItemDelegate):
         minus, plus = button_rects(rect)
         painter.drawRoundedRect(plus, 20, 20)
 
-    def _paint_header(self, painter: QPainter, rect: QRect, h: DisplayHeader) -> None:
-        painter.setPen(Qt.NoPen)
-        painter.setBrush(QColor(_C_TEXT2))
-        x = rect.left() + 10
-        cy = rect.center().y()
-        if h.collapsed:  # strzałka w prawo
-            painter.drawPolygon(
-                QPolygonF([QPointF(x, cy - 5), QPointF(x + 8, cy), QPointF(x, cy + 5)])
-            )
-        else:  # strzałka w dół
-            painter.drawPolygon(
-                QPolygonF([QPointF(x, cy - 3), QPointF(x + 8, cy - 3), QPointF(x + 4, cy + 4)])
-            )
-        x += 16
-        painter.drawPixmap(x, rect.center().y() - 7, self._link_px)
-        x += 20
-        font = painter.font()
-        font.setPixelSize(12)
-        font.setBold(True)
-        painter.setFont(font)
-        painter.setPen(QPen(_C_TEXT2))
-        painter.drawText(
-            QRect(x, rect.top(), rect.width() - x - 180, rect.height()),
-            Qt.AlignVCenter | Qt.AlignLeft,
-            h.name,
-        )
-        painter.setPen(QPen(_C_TEXT3))
-        font.setBold(False)
-        painter.setFont(font)
-        painter.drawText(
-            QRect(rect.left(), rect.top(), rect.width() - 16, rect.height()),
-            Qt.AlignVCenter | Qt.AlignRight,
-            h.badge,
-        )
-
     def _paint_card(
         self, painter: QPainter, option: QStyleOptionViewItem, rect: QRect, d: Donghua
     ) -> None:
@@ -238,6 +196,16 @@ class CardDelegate(QStyledItemDelegate):
         painter.setBrush(bg)
         painter.setPen(QPen(border, 1))
         painter.drawRoundedRect(rect, 10, 10)
+        # M9: dwupoziomowe podświetlenie uniwersum (spójne z kartą widgetową)
+        hl = self._backend.hover_level(d)
+        if hl:
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(_HL_TINT[hl])
+            painter.drawRoundedRect(rect.adjusted(1, 1, -1, -1), 10, 10)
+            painter.setBrush(_HL_BAR[hl])
+            painter.drawRoundedRect(
+                QRect(rect.left() + 1, rect.top() + 10, 3, rect.height() - 20), 1, 1
+            )
 
         # okładka
         cover_rect = QRect(rect.left() + 12, rect.center().y() - 40, 57, 80)
@@ -334,12 +302,6 @@ class CardDelegate(QStyledItemDelegate):
 
     # --- interakcje ---
     def editorEvent(self, event, model, option, index):
-        if index.data(KIND_ROLE) == KIND_HEADER:
-            if event.type() == QEvent.MouseButtonRelease:
-                h = index.data(DATA_ROLE)
-                self._backend.headerToggled.emit(h.universe_id)
-                return True
-            return False
         if index.data(KIND_ROLE) != KIND_ITEM:
             return False
         d = index.data(DATA_ROLE)
@@ -389,6 +351,44 @@ class DelegateListBackend(ListBackend):
         self._view.setContentsMargins(8, 8, 8, 8)
         self._view.setContextMenuPolicy(Qt.CustomContextMenu)
         self._view.customContextMenuRequested.connect(self._context_menu)
+        # M9: hover → podświetlenie całego uniwersum (mousemove na viewporcie)
+        self._hover_uni = None
+        self._hover_id = None
+        self._view.setMouseTracking(True)
+        self._view.viewport().setMouseTracking(True)
+        self._view.viewport().installEventFilter(self)
+
+    # --- podświetlenie uniwersum (M9, §6.7) ---------------------------------------
+    def hover_level(self, d: Donghua) -> int:
+        if self._hover_uni is not None and d.universe_id == self._hover_uni:
+            return 2 if d.id == self._hover_id else 1
+        return 0
+
+    def set_universe_hover(self, universe_id, donghua_id) -> None:
+        universe_id = int(universe_id) if universe_id is not None else None
+        donghua_id = int(donghua_id) if donghua_id is not None else None
+        if (universe_id, donghua_id) == (self._hover_uni, self._hover_id):
+            return
+        self._hover_uni, self._hover_id = universe_id, donghua_id
+        self._view.viewport().update()  # repaint wyłącznie widocznych kart
+
+    def universe_at_pos(self, pos):
+        index = self._view.indexAt(pos)
+        if not index.isValid():
+            return None, None
+        entry = self.model.entry_at(index.row())
+        if isinstance(entry, Donghua):
+            return entry.universe_id, entry.id
+        return None, None
+
+    def eventFilter(self, obj, event):  # noqa: N802 (Qt API)
+        etype = event.type()
+        if etype == QEvent.MouseMove:
+            uid, did = self.universe_at_pos(event.pos())
+            self.set_universe_hover(uid, did)
+        elif etype == QEvent.Leave:
+            self.set_universe_hover(None, None)
+        return False
 
     # --- API ListBackend ---
     def widget(self) -> QWidget:
@@ -408,12 +408,7 @@ class DelegateListBackend(ListBackend):
         self.model.remove(donghua_id)
 
     def count(self) -> int:
-        return sum(
-            1
-            for i in range(self.model.rowCount())
-            if self.model.entry_at(i) is not None
-            and not isinstance(self.model.entry_at(i), DisplayHeader)
-        )
+        return sum(1 for i in range(self.model.rowCount()) if self.model.entry_at(i) is not None)
 
     def clear(self) -> None:
         self.model.set_entries([])

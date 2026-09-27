@@ -216,13 +216,3 @@ class Universe:
     name: str = ""
     mal_anchor_id: Optional[int] = None
     created_at: str = ""
-
-
-@dataclass(frozen=True)
-class DisplayHeader:
-    """Nagłówek grupy uniwersum na liście głównej (§6.7) — wpis display-modelu."""
-
-    universe_id: int
-    name: str
-    badge: str
-    collapsed: bool = False

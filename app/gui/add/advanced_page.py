@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtWidgets import (
     QButtonGroup,
     QComboBox,
@@ -23,7 +23,14 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from app.domain.models import Donghua, SearchItem, Status, StreamingLink, Universe
+from app.domain.models import (
+    Donghua,
+    MediaType,
+    SearchItem,
+    Status,
+    StreamingLink,
+    Universe,
+)
 from app.gui import theme as _theme
 from app.gui.add.streaming_links import StreamingLinksWidget
 
@@ -37,11 +44,23 @@ _STATUS_PL = {
 NEW_UNIVERSE = "__new__"
 NO_UNIVERSE = "__none__"
 
+# M9: wybór typu we wpisie ręcznym (PPM na FABie)
+_MEDIA_CHOICES = [
+    ("Nieznany", MediaType.UNKNOWN),
+    ("TV", MediaType.TV),
+    ("ONA", MediaType.ONA),
+    ("OVA", MediaType.OVA),
+    ("Film", MediaType.MOVIE),
+    ("Special", MediaType.SPECIAL),
+    ("Music", MediaType.MUSIC),
+]
+
 
 class AdvancedPage(QWidget):
     backRequested = pyqtSignal()
     saveRequested = pyqtSignal()
     deleteRequested = pyqtSignal(int)  # donghua_id (tylko tryb edycji)
+    coverPreviewRequested = pyqtSignal(str)  # M9: url okładki do podglądu (worker!)
 
     def __init__(self, parent: QWidget = None) -> None:
         super().__init__(parent)
@@ -53,6 +72,50 @@ class AdvancedPage(QWidget):
         self._title.setObjectName("advancedTitle")
         self._title.setWordWrap(True)
         outer.addWidget(self._title)
+
+        # --- M9: pola wpisu ręcznego (PPM na FABie); ukryte poza trybem manual ---
+        self._manual_box = QWidget(self)
+        mform = QFormLayout(self._manual_box)
+        mform.setContentsMargins(0, 0, 0, 0)
+        mform.setSpacing(10)
+        self._m_title = QLineEdit(self._manual_box)
+        self._m_title.setPlaceholderText("Nazwa serii (wymagana)")
+        self._m_title.textChanged.connect(lambda _t: self._m_title.setStyleSheet(""))
+        mform.addRow("Tytuł *", self._m_title)
+        self._m_title_alt = QLineEdit(self._manual_box)
+        self._m_title_alt.setPlaceholderText("Opcjonalnie: tytuł oryginalny / alt")
+        mform.addRow("Tytuł alt.", self._m_title_alt)
+        self._m_year = QSpinBox(self._manual_box)
+        self._m_year.setRange(0, 2100)
+        self._m_year.setSpecialValueText("brak")
+        self._m_year.setFixedWidth(90)
+        mform.addRow("Rok", self._m_year)
+        self._m_media = QComboBox(self._manual_box)
+        for label, value in _MEDIA_CHOICES:
+            self._m_media.addItem(label, value)
+        mform.addRow("Typ", self._m_media)
+        cover_row = QWidget(self._manual_box)
+        cover_layout = QHBoxLayout(cover_row)
+        cover_layout.setContentsMargins(0, 0, 0, 0)
+        cover_layout.setSpacing(8)
+        self._m_cover = QLineEdit(cover_row)
+        self._m_cover.setPlaceholderText("https://… (jpg/png) — podgląd pobierze worker")
+        self._m_cover.textChanged.connect(self._on_cover_text)
+        cover_layout.addWidget(self._m_cover, 1)
+        self._cover_preview = QLabel(cover_row)
+        self._cover_preview.setObjectName("coverLabel")
+        self._cover_preview.setFixedSize(57, 80)
+        self._cover_preview.setAlignment(Qt.AlignCenter)
+        self._cover_preview.setPixmap(_theme.icon("cover_placeholder").pixmap(57, 80))
+        cover_layout.addWidget(self._cover_preview)
+        mform.addRow("Okładka URL", cover_row)
+        self._manual_box.hide()
+        outer.addWidget(self._manual_box)
+        self._cover_requester = None  # fn(pairs) → CoverCoordinator.request_pairs (R1/R3)
+        self._cover_debounce = QTimer(self)
+        self._cover_debounce.setSingleShot(True)
+        self._cover_debounce.setInterval(600)
+        self._cover_debounce.timeout.connect(self._request_cover_preview)
 
         form = QFormLayout()
         form.setSpacing(10)
@@ -136,6 +199,9 @@ class AdvancedPage(QWidget):
     def load_from_item(self, item: SearchItem, universes: Dict[int, Universe]) -> None:
         self._editing: Optional[Donghua] = None
         self._delete.hide()
+        self._back.show()
+        self._manual_box.hide()
+        self._title.show()
         self._title.setText(item.title)
         self._episode.setMaximum(max(0, item.total_episodes))
         self._episode.setValue(0)
@@ -149,6 +215,18 @@ class AdvancedPage(QWidget):
     ) -> None:
         self._editing = d
         self._delete.show()
+        manual = (d.provider or "manual") == "manual"
+        self._back.setVisible(not manual)  # M9: ręczna edycja nie ma „wstecz” do szukajki
+        self._manual_box.setVisible(manual)
+        self._title.setVisible(not manual)
+        if manual:  # M9: ręczny wpis — tytuł/rok/typ/okładka edytowalne
+            self._m_title.setText(d.title)
+            self._m_title_alt.setText(d.title_alt or "")
+            self._m_year.setValue(int(d.start_year or 0))
+            idx = self._m_media.findData(d.media_type)
+            self._m_media.setCurrentIndex(max(0, idx))
+            self._m_cover.setText(d.cover_key or "")
+            self._set_cover_preview(d.cover_key)
         self._title.setText(d.title)
         self._episode.setMaximum(max(0, d.total_episodes))
         self._episode.setValue(d.current_episode)
@@ -171,6 +249,62 @@ class AdvancedPage(QWidget):
         self._universe.blockSignals(False)
         self._new_universe.hide()
 
+    # --- M9: tryb ręczny + podgląd okładki ------------------------------------------
+    def set_cover_requester(self, fn) -> None:
+        """fn(pairs: List[(url, mal_id)]) — kolejka LOW NetworkWorkera (R1: nie w GUI)."""
+        self._cover_requester = fn
+
+    def apply_cover_preview(self, url: str, pixmap) -> None:
+        if url != self._m_cover.text().strip():
+            return  # odpowiedź dla innego urla (R5-ish: ignoruj stare podglądy)
+        self._set_cover_preview(url, pixmap)
+
+    def _set_cover_preview(self, url, pixmap=None) -> None:
+        if pixmap is None and url:
+            from app.gui.cover_coordinator import shared_pixmaps
+
+            pixmap = shared_pixmaps().get(str(url))
+        if pixmap is None or pixmap.isNull():
+            self._cover_preview.setPixmap(_theme.icon("cover_placeholder").pixmap(57, 80))
+        else:
+            self._cover_preview.setPixmap(
+                pixmap.scaled(57, 80, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            )
+
+    def _on_cover_text(self, _text: str) -> None:
+        self._cover_preview.setPixmap(_theme.icon("cover_placeholder").pixmap(57, 80))
+        self._cover_debounce.start()
+
+    def _request_cover_preview(self) -> None:
+        url = self._m_cover.text().strip()
+        if url.startswith(("http://", "https://")):
+            self.coverPreviewRequested.emit(url)
+            if self._cover_requester is not None:
+                self._cover_requester([(url, 0)])
+
+    def load_manual(self, universes: Dict[int, Universe]) -> None:
+        """M9: czysty formularz ręczny (seria bez strony na MAL/AniList)."""
+        self._editing = None
+        self._delete.hide()
+        self._back.hide()  # nie ma wyszukiwarki „w tyle” — Esc zamyka dialog
+        self._manual_box.show()
+        self._title.hide()
+        self._m_title.setText("")
+        self._m_title_alt.setText("")
+        self._m_year.setValue(0)
+        self._m_media.setCurrentIndex(0)
+        self._m_cover.setText("")
+        self._cover_preview.setPixmap(_theme.icon("cover_placeholder").pixmap(57, 80))
+        self._episode.setMaximum(0)
+        self._episode.setValue(0)
+        self._total.setValue(0)
+        self._set_status(Status.PLANNED)
+        self.links.set_links([])
+        self._load_universes(universes, None)
+
+    def manual_mode(self) -> bool:
+        return self._manual_box.isVisible()
+
     # --- formularz ---------------------------------------------------------------------
     def form(self) -> dict:
         status = next(s for s, b in self._status_buttons.items() if b.isChecked())
@@ -185,6 +319,7 @@ class AdvancedPage(QWidget):
         episode = self._episode.value()
         if total > 0:
             episode = min(episode, total)
+        manual = self.manual_mode()
         return {
             "status": status,
             "episode": episode,
@@ -192,6 +327,12 @@ class AdvancedPage(QWidget):
             "links": self.links.get_links(),
             "universe": universe,
             "editing": self._editing,
+            "manual": manual,
+            "title": self._m_title.text().strip() if manual else "",
+            "title_alt": (self._m_title_alt.text().strip() or None) if manual else None,
+            "start_year": (self._m_year.value() or None) if manual else None,
+            "media_type": self._m_media.currentData() if manual else None,
+            "cover_url": (self._m_cover.text().strip() or None) if manual else None,
         }
 
     # --- sloty ---------------------------------------------------------------------------
@@ -213,4 +354,9 @@ class AdvancedPage(QWidget):
             self.deleteRequested.emit(self._editing.id)
 
     def _on_save(self) -> None:
+        # M9: ręczny wpis bez tytułu = zapis wstrzymany + czerwona ramka (Biblia §26)
+        if self.manual_mode() and not self._m_title.text().strip():
+            self._m_title.setStyleSheet("border: 1px solid #C62828;")
+            self._m_title.setFocus()
+            return
         self.saveRequested.emit()

@@ -24,8 +24,8 @@ serie łączone w uniwersa i układane w kolejności oglądania.**
 >
 > ![DongStack — uniwersa](docs/screenshots/universes.png)
 >
-> *Uniwersa: franczyzy ułożone w kolejności oglądania (S1 → S2 → S3 → spin-offy),
-> nagłówki z łącznym postępem, zwijanie jednym kliknięciem.*
+> *Uniwersa: franczyzy ułożone w kolejności oglądania (S1 → S2 → S3 → spin-offy).
+> Najedź kursorem na kartę — podświetli się ona i CAŁE jej uniwersum (słabiej).*
 
 ---
 
@@ -36,7 +36,10 @@ serie łączone w uniwersa i układane w kolejności oglądania.**
 - **Undo zamiast „Czy na pewno?”** — operacje odwracalne cofasz z paska SnackBar, nie z `QMessageBox`.
 - **Uniwersa:** serie łączą się w łańcuchy prequel→sequel (dane z oficjalnego MAL API
   `related_anime`), a dashboard układa je **od 1. sezonu do ostatniego, potem filmy i specjały**.
-  Koniec z „s2, s5, s1, s7” w losowej kolejności.
+  Koniec z „s2, s5, s1, s7” w losowej kolejności. Hover podświetla całe uniwersum karty
+  pod kursorem — widzisz rodzinę bez klikania i zwijania.
+- **Wpis ręczny (PPM na `+`):** seria jeszcze bez strony na MAL/AniList (np. sezon
+  w produkcji)? Prawy klik na FABie otwiera formularz ręczny z okładką z URL-i podglądem.
 - **Offline-first:** lokalna baza SQLite + cache wyników i okładek — aplikacja działa bez sieci,
   a MAL odwiedza oszczędnie (≤1 zapytanie/s, kolejka, backoff wykładniczy).
 - **Flat dark mode warstwami jasności** — zero blur/shadow/animowanych gradientów;
