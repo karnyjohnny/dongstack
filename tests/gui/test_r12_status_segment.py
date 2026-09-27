@@ -20,7 +20,10 @@ Kontrakt po fixie (drabinka na status):
 - wciśnięty (zaznaczony lub nie): tło #303030, ramka + tekst o stopień JAŚNIEJSZE.
 
 Testy są pikselowe (grab() realnego widgetu z realnym QSS) — dokładnie ta metoda,
-którą udowodniono bug i fix offscreen; na Windows dochodzi jedynie natywny font.
+którą udowodniono bug i fix offscreen. r13: na CI (Windows offscreen) Qt nie ma
+fontów systemowych, więc conftest ładuje vendoryzowane DejaVu (tests/fonts) —
+FreeType rasteryzuje identycznie jak na Linuksie; testy glifów biorą fixture
+`require_real_fonts` (skip tylko na wtyczce `minimal`, która nie ma bazy fontów).
 """
 
 from __future__ import annotations
@@ -112,7 +115,7 @@ def _page_with(qapp, status: Status, *, checked: bool, down: bool):
 
 
 # ------------------------------------------------------- stan: niezaznaczony
-def test_unchecked_muted_border_and_bright_text(qapp):
+def test_unchecked_muted_border_and_bright_text(qapp, require_real_fonts):
     for st in Status:
         page, btn = _page_with(qapp, st, checked=False, down=False)
         img = _grab(btn)
@@ -123,7 +126,7 @@ def test_unchecked_muted_border_and_bright_text(qapp):
 
 
 # ------------------------------------------------------- stan: zaznaczony
-def test_checked_border_and_text_in_full_status_color(qapp):
+def test_checked_border_and_text_in_full_status_color(qapp, require_real_fonts):
     """Sedno feedbacku r12: zaznaczony ma ramkę I napis w kolorze statusu."""
     for st in Status:
         page, btn = _page_with(qapp, st, checked=True, down=False)
@@ -148,7 +151,7 @@ def test_checked_has_no_full_status_fill(qapp):
 
 
 # ------------------------------------------------------- stan: wciśnięty
-def test_pressed_lightens_border_and_text(qapp):
+def test_pressed_lightens_border_and_text(qapp, require_real_fonts):
     """Wciśnięty (checked lub nie) = ramka + tekst JAŚNIEJSZE o stopień (BRIGHT).
     Eksplicytne reguły :pressed/:checked:pressed usuwają natywny aero-fill z Win7."""
     for checked in (False, True):

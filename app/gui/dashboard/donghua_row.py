@@ -243,28 +243,53 @@ class DonghuaRow(QFrame):
         at_cap = d.total_episodes > 0 and d.current_episode >= d.total_episodes
         self._plus.setEnabled(not at_cap)
 
+    def _sync_layout(self) -> None:
+        """r13 (CI windows-2022): SYNCHRONICZNIE nadaj potomkom realną geometrię.
+
+        Windows offscreen nie zawsze dostarcza LayoutRequest przed kolejnym
+        odczytem `width()` — elide liczone ze stale szerokością ukrytej etykiety
+        (domyślne 100 px) trwale obcinało tekst (metryki fallback „box” ~1 em/znak:
+        'Soul Lan…'). setGeometry(rect) rozmieszcza dzieci BEZ skutków ubocznych
+        (activate() na layoucie top-level resize'uje okno do sizeHint — m2 regression).
+        """
+        lay = self.layout()
+        if lay is not None:
+            lay.setGeometry(self.contentsRect())
+        info = self._alt.parentWidget()
+        if info is not None and info.layout() is not None:
+            info.layout().setGeometry(info.contentsRect())
+
     def _relide_title(self) -> None:
         """Tytuł: dokładnie 1 linia z ElideRight (Biblia §5.1)."""
+        self._sync_layout()
         fm = self._title.fontMetrics()
         width = self._title.width() if self._title.width() > 20 else 320
         self._title.setText(fm.elidedText(self._full_title, Qt.ElideRight, width))
 
     def _set_alt(self, alt) -> None:
-        """QoL r11: alt-tytuł mniejszą czcionką; pusty = wiersz zwinięty (brak luzu)."""
+        """QoL r11: alt-tytuł mniejszą czcionką; pusty = wiersz zwinięty (brak luzu).
+
+        r13: kolejność ma znaczenie — najpierw pełny tekst + show(), potem
+        synchroniczny layout i elide z REALNEJ szerokości. Stara kolejność
+        (elide → show) ciąęła tekst szerokością ukrytej etykiety (100 px).
+        """
         text = str(alt).strip() if alt else ""
         self._full_alt = text
         if not text:
             self._alt.clear()
             self._alt.hide()
             return
-        fm = self._alt.fontMetrics()
-        width = self._alt.width() if self._alt.width() > 20 else 320
-        self._alt.setText(fm.elidedText(text, Qt.ElideRight, width))
+        self._alt.setText(text)
         self._alt.show()
+        self._relide_alt()
 
     def _relide_alt(self) -> None:
-        if self._full_alt:
-            self._set_alt(self._full_alt)
+        if not self._full_alt:
+            return
+        self._sync_layout()
+        fm = self._alt.fontMetrics()
+        width = self._alt.width() if self._alt.width() > 20 else 320
+        self._alt.setText(fm.elidedText(self._full_alt, Qt.ElideRight, width))
 
     def _set_note_tooltip(self, note) -> None:
         """Notatka użytkownika (r11) widoczna w tooltipie karty — bez nowej linii w UI."""

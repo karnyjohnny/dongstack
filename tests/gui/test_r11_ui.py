@@ -224,6 +224,7 @@ def test_row_shows_alt_title_and_note_tooltip(qapp):
     row.set_donghua(_donghua(title_alt="Soul Land II", note="na CDA 52+x", current_episode=3))
     qapp.processEvents()
     assert row._alt.isVisible() is True
+    assert row._full_alt == "Soul Land II"  # r13: pełny tekst niezależnie od elide
     assert row._alt.text().startswith("Soul Land")
     assert row.toolTip() == "Notatka: na CDA 52+x"
     assert row._episode.text() == "3/—"  # nieznany total → „—” (jak dotąd)
@@ -233,6 +234,28 @@ def test_row_shows_alt_title_and_note_tooltip(qapp):
     assert row._alt.isVisible() is False
     assert row.toolTip() == ""
     assert row.height() == 96  # stała wysokość karty (gate G3 / uniformItemSizes)
+    row.hide()
+
+
+def test_long_alt_title_elides_from_real_width_not_stale(qapp, require_real_fonts):
+    """Regresja r13 (CI windows-2022): stary `_set_alt` elide'ował TEKST PRZED
+    show() — szerokością ukrytej etykiety (domyślne 100 px), a nie realną
+    kolumną (~350 px). Z szerszymi metrykami (Windows offscreen bez fontów =
+    fallback „box” ~1 em/znak) alt zostawał trwale obcięty ('Soul Lan…'), bo
+    resizeEvent przy niezmienionej geometrii nie zachodzi. Po fixie: pełny
+    tekst → show() → synchroniczny layout → elide z realnej szerokości."""
+    long_alt = "Soul Land II: Legend of the Divine Realm Saga"  # ~225 px w 10 px
+    row = DonghuaRow()
+    row.resize(600, 96)
+    row.show()
+    qapp.processEvents()
+    row.set_donghua(_donghua(title_alt=long_alt))
+    qapp.processEvents()
+    assert row._full_alt == long_alt
+    assert row.width() == 600  # diagnostyka: offscreen nie może zwinąć wiersza
+    assert row._alt.width() > 200  # realna kolumna, nie stale 100 px
+    # mieści się → bez elide (mutacja: stara kolejność cięłaby przy 100 px)
+    assert row._alt.text() == long_alt
     row.hide()
 
 
@@ -283,7 +306,7 @@ def test_card_text_rects_reserve_alt_line():
     assert with_alt["bar"].bottom() <= rect.bottom()
 
 
-def test_delegate_paints_alt_line_and_pushes_meta_down(qapp):
+def test_delegate_paints_alt_line_and_pushes_meta_down(qapp, require_real_fonts):
     from app.gui.dashboard.delegate_backend import card_text_rects
 
     rects = card_text_rects(QRect(0, 3, 600, 90), 81, 480, True)
