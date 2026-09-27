@@ -133,9 +133,13 @@ jobs:
             --distpath dist\${{ matrix.arch }}-${{ matrix.package }} ^
             --workpath work\${{ matrix.arch }}-${{ matrix.package }}
 
-      - name: Smoke test frozen app (offscreen --selftest)
+      - name: Smoke test frozen app (offscreen --selftest) + gate M9
         shell: pwsh
         run: |
+          # r10: Start-Process -Wait (zamiast "& exe", ktore nie czeka na windowed
+          # app) i BRAK "Tee-Object $out" - Tee pisal do tego samego pliku co
+          # aplikacja (DONGSTACK_SELFTEST_OUT=$out) i ConvertFrom-Json dostawal
+          # scinki ("Unexpected character encountered ... : s").
           $env:QT_QPA_PLATFORM = "offscreen"
           $out = "selftest-${{ matrix.arch }}-${{ matrix.package }}.json"
           $env:DONGSTACK_SELFTEST_OUT = $out
@@ -144,10 +148,14 @@ jobs:
           } else {
             "dist\${{ matrix.arch }}-onedir\DongStack\DongStack.exe"
           }
-          & $exe --selftest | Tee-Object $out | Out-Null
-          $code = $LASTEXITCODE
+          $p = Start-Process -FilePath $exe -ArgumentList "--selftest" -NoNewWindow -Wait -PassThru
+          $code = $p.ExitCode
           Write-Host "selftest exit code: $code"
-          # Gate M9 (jak ci.yml): raport zrodl-em prawdy + kod wyjscia 0.
+          if (-not (Test-Path $out)) {
+            Write-Host "::error::Brak raportu selftest: $out"
+            exit 1
+          }
+          # Gate M9 (jak ci.yml): raport zrodlem prawdy + kod wyjscia 0.
           $report = Get-Content $out -Raw | ConvertFrom-Json
           Write-Host ("selftest report ok: " + $report.ok)
           if ($code -ne 0 -or $report.ok -ne $true) { exit 1 }

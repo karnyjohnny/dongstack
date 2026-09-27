@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 REM ============================================================
-REM  DongStack smoke test (M7) — wersja BAT dla Windows 7 bez
+REM  DongStack smoke test (M7) - wersja BAT dla Windows 7 bez
 REM  PowerShell (modowe buildy W7 czesto go nie maja / gryza sie
 REM  z UTF-8; ten plik jest czystym ASCII).
 REM  Uzycie:  smoke_test.bat  [sciezka\DongStack.exe]
@@ -54,6 +54,16 @@ echo Start     : %T0%
 echo End       : %T1%
 if "%RC%"=="0" (echo SELFTEST OK) else (echo SELFTEST FAILED)
 set "REPORT=%~dp1selftest-report.json"
+rem R16: cmd.exe w batchu czeka na proces potomny, ale na wolnym HDD / przy
+rem antywirusie dodajemy pasek bezpieczenstwa (max ~30 s) na plik raportu.
+set /a WAITED=0
+:wait_report
+if exist "%REPORT%" goto have_report
+if %WAITED% GEQ 30 goto have_report
+ping -n 2 127.0.0.1 >nul
+set /a WAITED=%WAITED%+1
+goto wait_report
+:have_report
 if exist "%REPORT%" (
   echo.
   echo == Selftest report M7 ^(JSON^) ==

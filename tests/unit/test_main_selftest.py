@@ -70,3 +70,20 @@ def test_version_flag(capsys):
         main_mod.main(["--version"])
     assert exc.value.code == 0
     assert __version__ in capsys.readouterr().out
+
+
+def test_selftest_report_env_path_relative(tmp_path, monkeypatch):
+    """Kontrakt CI (v1.2.1): DONGSTACK_SELFTEST_OUT względny → poprawny JSON w pliku.
+
+    Gate'y w ci.yml/release.yml czytają WYŁĄCZNIE ten plik (stdout windowed exe
+    nie jest przechwytywany), więc ścieżka względna musi działać od cwd.
+    """
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("DONGSTACK_HOME", raising=False)
+    monkeypatch.setenv("DONGSTACK_SELFTEST_OUT", "selftest-amd64-onedir.json")
+    code = main_mod.selftest()
+    assert code == 0
+    report = json.loads((tmp_path / "selftest-amd64-onedir.json").read_text(encoding="utf-8"))
+    assert report["ok"] is True
+    assert report["rows_alive"] == 300
+    monkeypatch.delenv("DONGSTACK_SELFTEST_OUT", raising=False)

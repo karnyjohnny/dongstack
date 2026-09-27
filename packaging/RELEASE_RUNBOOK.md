@@ -31,6 +31,12 @@
    live MAL (`workflow_dispatch` + secret `MAL_CLIENT_ID`, D5).
 5. `PyInstaller packaging\dongstack.spec` (onedir) / `DHT_ONEFILE=1` (onefile).
 6. Smoke: `DongStack.exe --selftest` (offscreen) — JSON z progami (exit≠0 = fail).
+   **R16:** exe jest *windowed* (`console=False`), więc PowerShell **nie czeka** na nie przy `& exe`
+   (`$LASTEXITCODE` pusty, raport jeszcze nie zapisany). W skryptach używaj
+   `Start-Process -FilePath $exe -ArgumentList "--selftest" -NoNewWindow -Wait -PassThru` → `$p.ExitCode`,
+   a raport czytaj z pliku `DONGSTACK_SELFTEST_OUT` (nigdy `Tee-Object` na tę samą ścieżkę — stdout exe
+   zaczyna się od `selftest-report: …`, więc `ConvertFrom-Json` się wysypie). `cmd.exe` w batchu czeka sam
+   (`tools\smoke_test.bat` ma dodatkowo pętlę oczekiwania na plik raportu).
 7. Pakowanie: `DongStack-3.13.5-win-<arch>-onedir.zip` / `…-portable.exe`
    + `SHA256SUMS-*.txt`; job `release` skleja sumy i publikuje GitHub Release.
 

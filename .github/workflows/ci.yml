@@ -55,16 +55,27 @@ jobs:
       - name: PyInstaller onedir (smoke)
         run: python -m PyInstaller packaging\dongstack.spec --noconfirm --distpath dist-smoke --workpath work-smoke
 
-      - name: Frozen selftest (offscreen)
+      - name: Frozen selftest (offscreen) + gate M9
+        shell: pwsh
         env:
           QT_QPA_PLATFORM: "offscreen"
+          # single-quote: w double-quoted YAML '\D' to nieznany escape (blad parsera)
+          DONGSTACK_SELFTEST_OUT: 'dist-smoke\DongStack\selftest-report.json'
         run: |
-          & dist-smoke\DongStack\DongStack.exe --selftest
-          $code = $LASTEXITCODE
+          # r10: aplikacji windowed (GUI subsystem) NIE odpalamy przez "& exe" -
+          # PowerShell nie czeka na jej zakonczenie: $LASTEXITCODE byl pusty, a
+          # Test-Path raportu odpalal sie zanim exe zdazyl go zapisac (raport
+          # istnial - widac go w kroku upload). Start-Process -Wait -PassThru =
+          # deterministyczne czekanie + prawdziwy kod wyjscia. Raport czytamy
+          # WYLACZNIE z pliku (stdout windowed exe nie jest przechwytywany).
+          $rp = $env:DONGSTACK_SELFTEST_OUT
+          $exe = (Resolve-Path "dist-smoke\DongStack\DongStack.exe").Path
+          $p = Start-Process -FilePath $exe -ArgumentList "--selftest" -NoNewWindow -Wait -PassThru
+          $code = $p.ExitCode
           Write-Host "selftest exit code: $code"
-          $rp = "dist-smoke\DongStack\selftest-report.json"
           if (-not (Test-Path $rp)) {
-            Write-Host "::error::Brak selftest-report.json obok exe"
+            Write-Host "::error::Brak selftest-report.json: $rp"
+            Get-ChildItem (Split-Path $rp) | Select-Object -ExpandProperty Name
             exit 1
           }
           $report = Get-Content $rp -Raw | ConvertFrom-Json
